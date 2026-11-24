@@ -1,0 +1,23 @@
+{
+  "name": "musicd",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Drop in a song, watch every part of it perform.",
+  "scripts": {
+    "vendor": "node scripts/copy-vendor.mjs && node scripts/fetch-yamnet.mjs",
+    "dev": "npm run vendor && vite",
+    "build": "npm run vendor && tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@spotify/basic-pitch": "^1.0.1",
+    "@tensorflow/tfjs": "^4.22.0",
+    "demucs-web": "^1.0.2",
+    "onnxruntime-web": "^1.31.1"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}
