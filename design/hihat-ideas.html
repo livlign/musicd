@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>musicd · ideas for the hi-hats</title>
+<style>
+  :root { --bg: #030308; --panel: #0a0b14; --line: #1a1c2c; --text: #e6e9f5; --muted: #8b90aa; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { max-width: 1240px; margin: 0 auto; padding: 40px 28px 22px; display: grid; gap: 16px; }
+  h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; font-weight: 650; }
+  h1 span { color: var(--muted); font-weight: 400; }
+  header p { margin: 0; color: var(--muted); max-width: 780px; text-wrap: pretty; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 13px; }
+  .controls label { display: inline-flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+  .controls input[type=range] { width: 130px; accent-color: #8a7cff; }
+  .controls select { background: #10121e; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font: inherit; }
+  .tick { display: inline-flex; gap: 3px; }
+  .tick i { width: 10px; height: 10px; border-radius: 3px; background: #1a1c2c; }
+  .tick i.on { background: #cfd6ff; }
+  .tick i.open { background: #8fe8ff; }
+  main { max-width: 1240px; margin: 0 auto; padding: 0 28px 40px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.ref { opacity: 0.85; }
+  canvas { display: block; width: 100%; aspect-ratio: 16 / 10; background: #020208; }
+  .info { padding: 14px 18px 18px; }
+  .head { display: flex; gap: 10px; align-items: baseline; }
+  .letter { font-weight: 700; font-size: 12px; color: var(--bg); background: #cfd6ff; border-radius: 6px; padding: 0 7px; }
+  .ref .letter { background: #555b78; color: var(--text); }
+  h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+  .info p { margin: 6px 0 0; color: var(--muted); font-size: 14px; text-wrap: pretty; }
+  .fit { margin-top: 8px !important; font-size: 13px !important; color: #b6bdd8 !important; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>The hi-hats <span>· ideas</span></h1>
+    <p>Hi-hats keep time: fast, crisp, high, usually on every eighth or sixteenth note, with an occasional
+      open hi-hat that rings longer. The visual should feel crisp and quick, keep time with them, live at the
+      edges where musicd puts high sounds, and belong to the sky. Each panel is a small Cosmos (stars,
+      incoming dust, the bass core) driven by the same hi-hat pattern. The last panel is today's version.</p>
+  </div>
+  <div class="controls">
+    <label>Pattern <select id="pattern">
+      <option value="8">eighth notes</option>
+      <option value="16">sixteenth notes</option>
+      <option value="4">quarter notes (sparse)</option>
+    </select></label>
+    <label>Tempo <input type="range" id="bpm" min="70" max="160" step="1" value="112"> <b id="bpmv">112</b> bpm</label>
+    <label>Open hi-hat <input type="checkbox" id="open" checked></label>
+    <span class="tick" id="tick"></span>
+  </div>
+</header>
+<main id="grid"></main>
+
+<script>
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const TAU = Math.PI * 2;
+let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const puffCache = new Map();
+function puff(hue, sat = 70, light = 60) {
+  const key = `${Math.round(hue / 6) * 6}|${sat}|${light}`;
+  let c = puffCache.get(key);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    for (let i = 0; i <= 6; i++) { const u = i / 6; gr.addColorStop(u, `hsla(${hue} ${sat}% ${light}% / ${(0.5 * Math.exp(-u * u * 4.5)).toFixed(3)})`); }
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); puffCache.set(key, c);
+  }
+  return c;
+}
+const MOOD = 255; // a violet mood
+
+/** A small Cosmos: twinkling stars, incoming dust and the bass core. Exposes its stars and dust to the ideas. */
+function makeWorld() {
+  const stars = Array.from({ length: 170 }, () => ({ x: rnd(), y: rnd(), b: Math.pow(rnd(), 2.4), tw: rnd() * 6, spark: 0 }));
+  const dust = Array.from({ length: 120 }, () => ({ a: rnd() * TAU, r: 0.2 + rnd() * 2.6, z: 2 + rnd() * 30, h: rnd(), spark: 0, sx: 0, sy: 0 }));
+  return {
+    stars, dust,
+    draw(g, w, h, t, dt, beat) {
+      g.globalCompositeOperation = 'source-over'; g.fillStyle = '#020208'; g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = 'lighter';
+      for (const s of stars) {
+        s.spark *= Math.exp(-dt * 7);
+        const a = (0.15 + s.b * 0.42) * (0.75 + 0.25 * Math.sin(t * 0.8 + s.tw)) + s.spark * 0.9;
+        const r = (1 + s.b) * (1 + s.spark * 1.4);
+        g.fillStyle = `hsla(215 25% 92% / ${clamp(a)})`; g.fillRect(s.x * w - r / 2, s.y * h - r / 2, r, r);
+        if (s.spark > 0.2) { const R = 5 * s.spark; g.globalAlpha = s.spark * 0.6; g.drawImage(puff(215, 30, 85), s.x * w - R * 2, s.y * h - R * 2, R * 4, R * 4); g.globalAlpha = 1; }
+      }
+      const F = Math.min(w, h) * 0.85, cx = w / 2, cy = h / 2;
+      const core = Math.min(w, h) * (0.05 + beat * 0.03);
+      g.globalAlpha = 0.5 + beat * 0.4; g.drawImage(puff(30, 80, 62), cx - core * 2, cy - core * 2, core * 4, core * 4); g.globalAlpha = 1;
+      for (const d of dust) {
+        d.z -= dt * 3.2; d.spark *= Math.exp(-dt * 9);
+        if (d.z < 0.6) { d.z = 30; d.a = rnd() * TAU; d.r = 0.2 + rnd() * 2.6; }
+        const s = F / d.z; d.sx = cx + Math.cos(d.a) * d.r * s; d.sy = cy + Math.sin(d.a) * d.r * s;
+        const a = clamp((30 - d.z) / 8) * clamp((d.z - 0.6) / 5) * 0.4, R = clamp(0.012 * s, 0.6, 5);
+        g.globalAlpha = a; g.drawImage(puff((MOOD + 40 + d.h * 70) % 360, 85, 68), d.sx - R * 2, d.sy - R * 2, R * 4, R * 4); g.globalAlpha = 1;
+      }
+    },
+  };
+}
+
+/* ───────── A · Ticking rim ───────── */
+function rim() {
+  const N = 32; const lit = new Float32Array(N); let pos = 0;
+  return {
+    hat(v, open) { lit[pos % N] = Math.max(lit[pos % N], open ? 1.6 : v); if (open) lit[(pos + 1) % N] = Math.max(lit[(pos + 1) % N], 0.6); pos++; },
+    draw(g, w, h, t, dt) {
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2, R = M * 0.47;
+      for (let i = 0; i < N; i++) {
+        lit[i] *= Math.exp(-dt * (lit[i] > 1 ? 2.2 : 6));
+        const ang = (i / N) * TAU - Math.PI / 2 + t * 0.02;
+        const base = 0.14, a = base + clamp(lit[i]) * 0.85;
+        const x0 = cx + Math.cos(ang) * R * 1.2, y0 = cy + Math.sin(ang) * R;
+        const len = 4 + clamp(lit[i]) * 9;
+        g.strokeStyle = `hsla(215 40% 92% / ${a})`; g.lineWidth = 1.2;
+        g.beginPath(); g.moveTo(x0, y0); g.lineTo(cx + Math.cos(ang) * (R * 1.2 + len), cy + Math.sin(ang) * (R + len)); g.stroke();
+        if (lit[i] > 0.15) { const P = 3 + 6 * clamp(lit[i]); g.globalAlpha = clamp(lit[i]) * 0.6; g.drawImage(puff(215, 35, 85), x0 - P * 2, y0 - P * 2, P * 4, P * 4); g.globalAlpha = 1; }
+      }
+    },
+  };
+}
+
+/* ───────── B · Frost on the dust ───────── */
+function frost(world) {
+  return {
+    hat(v, open) {
+      // The motes out at the edges (where high sounds live) catch the light.
+      const outer = world.dust.filter((d) => d.r > 1.4 && d.z < 22);
+      const n = Math.round((open ? 12 : 5) * (0.5 + v));
+      for (let i = 0; i < n && outer.length; i++) { const d = outer[Math.floor(rnd() * outer.length)]; d.spark = Math.max(d.spark, open ? 1 : 0.6 + v * 0.4); }
+    },
+    draw(g) {
+      for (const d of world.dust) {
+        if (d.spark < 0.05) continue;
+        const R = 2 + d.spark * 4;
+        g.globalAlpha = d.spark * 0.8; g.drawImage(puff(205, 30, 88), d.sx - R * 2, d.sy - R * 2, R * 4, R * 4);
+        g.globalAlpha = 1; g.fillStyle = `hsla(210 40% 98% / ${d.spark})`; g.beginPath(); g.arc(d.sx, d.sy, 0.8 + d.spark, 0, TAU); g.fill();
+      }
+    },
+  };
+}
+
+/* ───────── C · Fine rain of light ───────── */
+function rain() {
+  const streaks = [];
+  return {
+    hat(v, open) {
+      const n = open ? 9 : Math.round(2 + 3 * v);
+      for (let i = 0; i < n; i++) streaks.push({ ang: rnd() * TAU, r: 0.32 + rnd() * 0.12, life: 0, max: open ? 0.5 : 0.18 + rnd() * 0.06, v });
+    },
+    draw(g, w, h, t, dt) {
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2;
+      for (let i = streaks.length - 1; i >= 0; i--) {
+        const s = streaks[i]; s.life += dt; const k = s.life / s.max;
+        if (k >= 1) { streaks.splice(i, 1); continue; }
+        // A fine streak flying outward, past you, like speed lines in fine rain.
+        const r0 = s.r + k * 0.16, r1 = r0 + 0.05 + 0.04 * s.v;
+        const a = (1 - k) * (0.5 + 0.5 * s.v);
+        const gr = g.createLinearGradient(cx + Math.cos(s.ang) * r0 * M * 1.2, cy + Math.sin(s.ang) * r0 * M, cx + Math.cos(s.ang) * r1 * M * 1.2, cy + Math.sin(s.ang) * r1 * M);
+        gr.addColorStop(0, `hsla(210 40% 95% / 0)`); gr.addColorStop(1, `hsla(210 40% 97% / ${a})`);
+        g.strokeStyle = gr; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(cx + Math.cos(s.ang) * r0 * M * 1.2, cy + Math.sin(s.ang) * r0 * M); g.lineTo(cx + Math.cos(s.ang) * r1 * M * 1.2, cy + Math.sin(s.ang) * r1 * M); g.stroke();
+      }
+    },
+  };
+}
+
+/* ───────── D · Glitter halo ───────── */
+function glitter() {
+  const grains = Array.from({ length: 420 }, () => ({ ang: rnd() * TAU, r: 0.4 + (rnd() + rnd() - 1) * 0.04, b: rnd(), spark: 0 }));
+  let wave = 0, waveA = 0, flash = 0;
+  return {
+    hat(v, open) {
+      // A shimmer runs round the ring from a fresh point; an open hi-hat makes it sizzle all round.
+      wave = rnd() * TAU; waveA = 0.5 + 0.5 * v; if (open) flash = 1;
+    },
+    draw(g, w, h, t, dt) {
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2;
+      waveA *= Math.exp(-dt * 7); flash *= Math.exp(-dt * 2.5);
+      for (const q of grains) {
+        let d = Math.abs(((q.ang - wave + Math.PI) % TAU + TAU) % TAU - Math.PI);
+        const lit = waveA * Math.exp(-(d * d) / 0.25) + flash * (0.4 + 0.6 * Math.sin(t * 40 + q.b * 50) ** 2);
+        const a = 0.05 + q.b * 0.08 + lit * (0.5 + q.b * 0.5);
+        g.fillStyle = `hsla(215 35% 92% / ${clamp(a)})`;
+        const s = 1 + lit * 1.2;
+        g.fillRect(cx + Math.cos(q.ang + t * 0.03) * q.r * M * 1.2 - s / 2, cy + Math.sin(q.ang + t * 0.03) * q.r * M - s / 2, s, s);
+      }
+    },
+  };
+}
+
+/* ───────── E · The sky twinkles ───────── */
+function twinkle(world) {
+  return {
+    hat(v, open) {
+      const n = open ? 14 : Math.round(3 + 4 * v);
+      for (let i = 0; i < n; i++) { const s = world.stars[Math.floor(rnd() * world.stars.length)]; s.spark = Math.max(s.spark, open ? 1 : 0.5 + 0.5 * v); }
+    },
+    draw() {},
+  };
+}
+
+/* ───────── today · glints ───────── */
+function today() {
+  const glints = [];
+  return {
+    hat(v) { const base = rnd() * TAU, n = Math.round(2 + 8 * v); for (let i = 0; i < n; i++) glints.push({ ang: base + (rnd() - 0.5) * 2.4, r: 0.4 + rnd() * 0.1, life: 0, max: 0.22 + rnd() * 0.12, size: 0.3 + v * 1.1 }); },
+    draw(g, w, h, t, dt) {
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2;
+      for (let i = glints.length - 1; i >= 0; i--) {
+        const q = glints[i]; q.life += dt; const k = q.life / q.max;
+        if (k >= 1) { glints.splice(i, 1); continue; }
+        const a = (1 - k) * (k < 0.15 ? k / 0.15 : 1), x = cx + Math.cos(q.ang) * q.r * M * 1.15, y = cy + Math.sin(q.ang) * q.r * M, L = (3 + 7 * q.size) * (1 - k * 0.4);
+        g.strokeStyle = `hsla(${(MOOD + 150) % 360} 60% 92% / ${a * 0.9})`; g.lineWidth = 0.9;
+        g.beginPath(); g.moveTo(x - L, y); g.lineTo(x + L, y); g.moveTo(x, y - L); g.lineTo(x, y + L); g.stroke();
+      }
+    },
+  };
+}
+
+const IDEAS = [
+  { key: 'A', name: 'Ticking rim', make: rim, desc: 'A ring of fine ticks around the edge of view, like a watch bezel. Each hi-hat lights the next tick, so the light steps round in time; an open hi-hat lights a longer, lingering arc.', fit: 'Fits: it literally shows the time-keeping, and it is crisp. Risk: a fixed ring is more "interface" than sky.' },
+  { key: 'B', name: 'Frost on the dust', make: frost, desc: 'The incoming dust motes out at the edges, where musicd already puts high sounds, catch the light for an instant on each hi-hat, like frost glinting. An open hi-hat makes many sparkle at once.', fit: 'Fits: adds nothing new to the sky, it brings what is there alive, right where the highs belong. Risk: tied to how much dust there is.' },
+  { key: 'C', name: 'Fine rain of light', make: rain, desc: 'A few hair-thin streaks of light fly outward past you at the edges on each hi-hat, like fine rain on a windscreen at speed. An open hi-hat sends a longer shower.', fit: 'Fits: it moves with the flight and feels fast and crisp. Risk: at sixteenth notes it can get busy.' },
+  { key: 'D', name: 'Glitter halo', make: glitter, desc: 'A faint ring of fine glitter around the edge of view. Each hi-hat sends a shimmer through part of it; an open hi-hat makes the whole ring sizzle, like a cymbal.', fit: 'Fits: shimmer is what a hi-hat sounds like, and it stays fine-grained. Risk: a ring again, though softer than A.' },
+  { key: 'E', name: 'The sky twinkles', make: twinkle, desc: 'A few of the background stars twinkle brightly on each hi-hat; an open hi-hat sets a whole patch of sky twinkling.', fit: 'Fits: the most natural, nothing added at all. Risk: the subtlest; it may be missed in a busy moment.' },
+  { key: '·', name: 'Today: glints', make: today, ref: true, desc: 'The current hi-hats: small four-point crosses that pop around the edge of view.', fit: 'For comparison: crosses read as symbols placed on top of the sky.' },
+];
+
+const grid = document.getElementById('grid');
+const panels = IDEAS.map((idea) => {
+  const card = document.createElement('article');
+  card.className = 'card' + (idea.ref ? ' ref' : '');
+  card.innerHTML = `<canvas></canvas><div class="info"><div class="head"><span class="letter">${idea.key}</span><h2>${idea.name}</h2></div><p>${idea.desc}</p><p class="fit">${idea.fit}</p></div>`;
+  grid.append(card);
+  const canvas = card.querySelector('canvas'), world = makeWorld();
+  return { canvas, g: canvas.getContext('2d'), world, fx: idea.make(world) };
+});
+
+const patternEl = document.getElementById('pattern'), bpmEl = document.getElementById('bpm'), openEl = document.getElementById('open'), tickEl = document.getElementById('tick');
+bpmEl.oninput = () => { document.getElementById('bpmv').textContent = bpmEl.value; };
+for (let i = 0; i < 16; i++) tickEl.append(document.createElement('i'));
+let last = performance.now(), t = 0, nextHat = 0, step = 0, beat = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+  // Seconds between hi-hats: a bar is four beats, split into `per` steps.
+  const per = +patternEl.value, spb = 60 / +bpmEl.value, gap = (spb * 4) / per;
+  if (nextHat < t - 0.5) nextHat = t; // after a tempo change or a stall, don't catch up in a burst
+  beat *= Math.exp(-dt * 8);
+  while (t >= nextHat) {
+    // Accent on the beat, softer in between; an open hi-hat on the last eighth of every second bar.
+    const stepsPerBar = per, i = step % (stepsPerBar * 2);
+    const onBeat = (step % (per / 4)) === 0;
+    const open = openEl.checked && i === stepsPerBar * 2 - Math.max(1, per / 8);
+    const v = open ? 1 : onBeat ? 0.9 : 0.45 + 0.15 * Math.random();
+    for (const p of panels) p.fx.hat(v, open);
+    if (onBeat && (step / (per / 4)) % 2 === 0) beat = 1;
+    [...tickEl.children].forEach((c, k) => { c.className = k === step % 16 ? (open ? 'open' : 'on') : ''; });
+    step++; nextHat += gap;
+  }
+  for (const p of panels) {
+    const dpr = Math.min(2, devicePixelRatio || 1), w = p.canvas.clientWidth * dpr, h = p.canvas.clientHeight * dpr;
+    if (p.canvas.width !== w || p.canvas.height !== h) { p.canvas.width = w; p.canvas.height = h; }
+    p.world.draw(p.g, w, h, t, dt, beat);
+    p.g.globalCompositeOperation = 'lighter';
+    p.fx.draw(p.g, w, h, t, dt);
+    p.g.globalCompositeOperation = 'source-over';
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 // The bass is the core at the vanishing point, swelling with every bass note.
 // A kick sends a shockwave across space and a surge forward (the dust stretches
 // into streaks); a snare throws a ring of light that flies past you; hi-hats
-// glint at the edge of vision; cymbals shimmer everything. A sung melody is a
+// make the stars twinkle; cymbals shimmer everything. A sung melody is a
 // comet gliding ahead, shedding a warm trail that drifts past you. Harmony
 // colours the distant nebulae. Silence settles into a slow, quiet float.
 import type { Frame } from '../feed/frame';
@@ -75,7 +75,7 @@ export class Cosmos {
   private rings: Ring[] = [];
   private waves: { age: number; v: number }[] = [];
   /** Deep star field in 3-D: stars of different colours and brightness, recycled as you travel. */
-  private stars: { x: number; y: number; z: number; r: number; hue: number; sat: number; tw: number; bright: number }[] = [];
+  private stars: { x: number; y: number; z: number; r: number; hue: number; sat: number; tw: number; bright: number; spark: number }[] = [];
   /** Scenery that comes and goes: nebula clouds, galaxies, star clusters. */
   private sights: { kind: 'nebula' | 'cluster'; x: number; y: number; z: number; size: number; hue: number; spin: number; seed: number; pts?: [number, number][] }[] = [];
   private nextSight = 4;
@@ -112,12 +112,19 @@ export class Cosmos {
   private intensity = 0.25;
   private sat = 50;
   private hitTimes: number[] = [];
-  /** Treble halo: crisp glints around the edge of view (hi-hats, highs). */
-  private glints: { ang: number; r: number; life: number; max: number; size: number }[] = [];
-  private glintDebt = 0;
+  /** Continuous treble makes the odd star twinkle too (accumulated fractional twinkles). */
+  private twinkleDebt = 0;
   /** 0 = the melodic instruments are keys … 1 = they are guitars. */
   private guitarness = 0.3;
   private lastChordAt = -1;
+  /**
+   * Guitar pick strokes: hair-fine arcs of warm light swept across the view.
+   * Angles in radians around the centre; `r` is a share of the screen; `dir`
+   * alternates like down and up strokes; `drift` how far the line moves outward
+   * along its sweep (so it reads as a brush stroke, not part of a ring).
+   */
+  private picks: { a0: number; span: number; r: number; dir: number; life: number; max: number; v: number; drift: number }[] = [];
+  private pickDir = 1;
   private grit = 0;
   /** Sustained, tonal sound (strings, pads, choirs, held notes) and its swell. */
   private tonal = 0;
@@ -132,9 +139,15 @@ export class Cosmos {
     flow: 0,
     wave: 9, // position of the light wave running outward along the band (9 = none)
     slow: 0, // slowly following strength, to notice held sound coming in
-    motes: Array.from({ length: 1600 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.4, b: Math.pow(Math.random(), 1.8), depth: Math.random() < 0.5 ? 0.5 : 1 })),
-    clouds: Array.from({ length: 30 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.22, r: 0.07 + Math.random() * 0.12, h: Math.random(), depth: Math.random() < 0.5 ? 0.5 : 1 })),
-    lanes: Array.from({ length: 11 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.12, r: 0.05 + Math.random() * 0.07, depth: Math.random() < 0.5 ? 0.5 : 1 })),
+    // Natural colours: warm cream starlight along the dense middle, blue-white
+    // towards the edges (`warm` 1..0), as in photographs of the Milky Way.
+    motes: Array.from({ length: 1600 }, () => {
+      const v = gauss() * 0.4;
+      return { u: Math.random() * 2.4 - 1.2, v, b: Math.pow(Math.random(), 1.8), depth: Math.random() < 0.5 ? 0.5 : 1, warm: Math.random() < Math.exp(-v * v * 12) ? 1 : 0 };
+    }),
+    nebulae: Array.from({ length: 7 }, (_, i) => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.25, r: 0.025 + Math.random() * 0.03, pink: i % 3 !== 2, depth: Math.random() < 0.5 ? 0.5 : 1 })),
+    clouds: Array.from({ length: 30 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.22, r: 0.07 + Math.random() * 0.12, h: Math.random(), b: 0.25 + 0.75 * Math.pow(Math.random(), 1.5), depth: Math.random() < 0.5 ? 0.5 : 1 })),
+    lanes: Array.from({ length: 24 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.14, r: 0.03 + Math.random() * 0.08, stretch: 1.5 + Math.random() * 2.5, depth: Math.random() < 0.5 ? 0.5 : 1 })),
   };
 
   constructor() {
@@ -153,7 +166,7 @@ export class Cosmos {
     const t = Math.random();
     const [hue, sat] = t < 0.55 ? [220, 10] : t < 0.8 ? [210, 55] : t < 0.93 ? [45, 60] : [20, 70];
     const bright = Math.random() < 0.03 ? 0.8 : Math.pow(Math.random(), 2.4) * 0.6;
-    return { x: (Math.random() * 2 - 1) * 60, y: (Math.random() * 2 - 1) * 40, z, r: 0.4 + Math.random() * 0.9 + bright * 0.6, hue, sat, tw: Math.random() * 6.28, bright };
+    return { x: (Math.random() * 2 - 1) * 60, y: (Math.random() * 2 - 1) * 40, z, r: 0.4 + Math.random() * 0.9 + bright * 0.6, hue, sat, tw: Math.random() * 6.28, bright, spark: 0 };
   }
 
   private newLane() {
@@ -216,6 +229,28 @@ export class Cosmos {
    * Guitar: a strum releases a warm sweep of sparks along one of the dust
    * lanes, flying past like everything else. Grittier guitar, more sparks.
    */
+  /**
+   * Make `n` background stars twinkle with strength `v`. With `patch`, they are
+   * the stars around one spot, so a patch of sky lights up together.
+   */
+  private twinkle(n: number, v: number, patch: boolean) {
+    const visible = this.stars.filter((st) => Math.abs(st.x / st.z) < 0.7 && Math.abs(st.y / st.z) < 0.45);
+    if (!visible.length) return;
+    if (patch) {
+      const c = visible[Math.floor(Math.random() * visible.length)];
+      const near = visible
+        .map((st) => ({ st, d: Math.hypot(st.x / st.z - c.x / c.z, st.y / st.z - c.y / c.z) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, n * 2);
+      for (const { st, d } of near) st.spark = Math.max(st.spark, v * (1 - d * 2));
+      return;
+    }
+    for (let i = 0; i < n; i++) {
+      const st = visible[Math.floor(Math.random() * visible.length)];
+      st.spark = Math.max(st.spark, v * (0.7 + 0.3 * Math.random()));
+    }
+  }
+
   /** A note of keys or another note instrument lights a star (see `noteStars`). */
   private noteStar(p: number, v: number, d: number, lead: boolean) {
     const pc = ((Math.round(p) % 12) + 12) % 12;
@@ -232,20 +267,27 @@ export class Cosmos {
     if (this.noteStars.length > 160) this.noteStars.shift();
   }
 
+  /** A guitar strum (or a single picked note): a pick stroke of light (see `picks`). */
   private strum(p: number, v: number, single: boolean) {
-    if (!single && this.t - this.lastChordAt < 0.12) return; // one sweep per strum
-    this.lastChordAt = this.t;
-    const lane = this.lanes.length ? this.lanes[Math.floor(Math.random() * this.lanes.length)] : null;
-    const base = lane ? lane.ang : Math.random() * Math.PI * 2;
-    const n = Math.round((single ? 4 : 10) * (0.6 + v) * (0.7 + this.grit * 2));
-    const hot = (this.warm + 350) % 360;
-    for (let i = 0; i < n; i++) {
-      if (this.dust.length >= MAX_DUST) this.dust.shift();
-      const ang = base + (i / Math.max(1, n - 1) - 0.5) * 0.9;
-      const r = 1.4 + (p - 40) / 60 + Math.random() * 0.3;
-      this.dust.push({ x: Math.cos(ang) * r, y: Math.sin(ang) * r, z: 9 + Math.random() * 3, size: 0.018 + v * 0.01, hue: hot, light: 72, a: 0.5 + v * 0.4, sx: 0, sy: 0, seen: false });
+    if (!single && this.t - this.lastChordAt < 0.12) return; // one stroke per strum
+    if (!single) {
+      this.lastChordAt = this.t;
+      this.pickDir = -this.pickDir; // down, up, down…
     }
+    this.picks.push({
+      a0: Math.random() * Math.PI * 2,
+      span: single ? 0.22 + Math.random() * 0.12 : 0.7 + 0.45 * v,
+      // Higher notes sit further out, like the high strings.
+      r: (single ? 0.17 + clamp((p - 50) / 40) * 0.2 : 0.24 + Math.random() * 0.12) * (0.95 + Math.random() * 0.1),
+      dir: single ? (Math.random() < 0.5 ? -1 : 1) : this.pickDir,
+      life: 0,
+      max: single ? 0.8 : 1.1,
+      v: clamp(0.4 + 0.6 * v),
+      drift: (single ? 0.02 : 0.05) * (0.6 + Math.random() * 0.8),
+    });
+    if (this.picks.length > 40) this.picks.shift();
   }
+
 
   private listen(f: Frame) {
     const dt = f.dt;
@@ -278,10 +320,9 @@ export class Cosmos {
         if (!f.beatLocked && hh.v > 0.5) this.beatFlash = Math.max(this.beatFlash, hh.v * 0.7);
         this.rings.push({ z: 9, r: 1.6 + Math.random() * 0.8, hue: (this.hue + 180) % 360, a: Math.pow(hh.v, 1.5), spin: Math.random() * 6 });
       } else if (hh.hit === 'hat') {
-        // A burst of crisp glints on the halo around the edge of view.
-        const base = Math.random() * Math.PI * 2;
-        const n = Math.round(2 + 8 * hh.v);
-        for (let i = 0; i < n; i++) this.glints.push({ ang: base + (Math.random() - 0.5) * 2.4, r: 0.4 + Math.random() * 0.1, life: 0, max: 0.22 + Math.random() * 0.12, size: 0.3 + hh.v * 1.1 });
+        // The sky keeps time: a few stars twinkle on each hi-hat; a loud one
+        // (an open hi-hat) sets a whole patch of sky twinkling.
+        this.twinkle(Math.round(3 + 5 * hh.v), hh.v, hh.v > 0.8);
       } else this.shimmer = Math.max(this.shimmer, hh.v);
     }
     // On the beat: the whole field brightens and the bass core flashes, timed by
@@ -292,17 +333,18 @@ export class Cosmos {
     }
     for (const n of f.notes) if (n.voice === 'bass') this.bassHit = Math.max(this.bassHit, 0.5 + n.v * 0.5);
 
-    // Guitar or keys? Two weak clues together: how gritty the mids sound
-    // (distortion is noise-like; piano is pure), and which of the two the
-    // sound classifier rates higher, even when both scores are small.
+    // Guitar or keys? The recogniser hears piano, organ and strings well but
+    // rarely hears guitars inside a full band mix, so notes count as guitar
+    // unless something says keys: the recogniser hearing keys or strings, or a
+    // very clean, pure tone. Grit (distortion is noise-like) and the
+    // recogniser hearing guitar push further towards guitar.
     this.grit = f.grit ?? this.grit;
     const gritG = clamp((this.grit - 0.08) / 0.15);
-    let g = gritG;
-    if (f.presence) {
-      const gp = f.presence.guitar;
-      const kp = Math.max(f.presence.keys, f.presence.synth * 0.6);
-      if (gp + kp > 0.02) g = 0.5 * gritG + 0.5 * (gp / (gp + kp));
-    }
+    const pres = f.presence;
+    const keys = pres ? clamp(Math.max(pres.keys, pres.synth * 0.6, pres.strings * 0.8) * 4) : 0;
+    const guitarHeard = pres ? clamp(pres.guitar * 4) : 0;
+    const pure = gritG < 0.1 ? 0.25 : 0;
+    let g = clamp(0.55 + 0.45 * gritG + 0.4 * guitarHeard - keys - pure);
     // Electronic music is gritty too (supersaws): that grit is synth, not guitar.
     if (f.layout === 'center') g *= 0.15;
     if (audible > 0.5) this.guitarness += (g - this.guitarness) * (1 - Math.exp(-dt / 2.5));
@@ -367,7 +409,9 @@ export class Cosmos {
     // The whole spectrum becomes dust: louder bands emit more motes, and a
     // swelling passage makes the whole field bloom.
     const bands = f.spectrum?.bands;
-    const rate = (40 + this.energy * 160 + this.swell * 90) * audible;
+    // Kept modest: energy now follows the real sound (often high in loud music),
+    // and a crowded stream pulls the eye away from everything else.
+    const rate = (30 + this.energy * 90 + this.swell * 50) * audible;
     for (let i = 0; i < SPECTRUM_BANDS; i++) {
       const fq = i / (SPECTRUM_BANDS - 1);
       const lv = bands ? bands[i] : 0;
@@ -377,17 +421,17 @@ export class Cosmos {
         this.spawn(fq, lv);
       }
     }
-    // Continuous treble keeps the halo softly sparkling.
+    // Continuous treble keeps the odd star softly twinkling.
     if (bands) {
       let hi = 0;
       for (let i = SPECTRUM_BANDS - 10; i < SPECTRUM_BANDS; i++) hi += bands[i] / 10;
-      this.glintDebt += Math.pow(hi, 2.5) * 40 * audible * dt;
-      while (this.glintDebt >= 1) {
-        this.glintDebt -= 1;
-        this.glints.push({ ang: Math.random() * Math.PI * 2, r: 0.38 + Math.random() * 0.14, life: 0, max: 0.4, size: 0.4 + hi * 0.5 });
+      this.twinkleDebt += Math.pow(hi, 2.5) * 25 * audible * dt;
+      if (this.twinkleDebt >= 1) {
+        const n = Math.floor(this.twinkleDebt);
+        this.twinkleDebt -= n;
+        this.twinkle(n, 0.35 + hi * 0.4, false);
       }
     }
-    if (this.glints.length > 300) this.glints.splice(0, this.glints.length - 300);
     // Quiet dust keeps space alive in silence: a calm drift, never a stop.
     if (Math.random() < dt * (3 + 7 * this.calm)) this.spawn(Math.random(), 0.12 + Math.random() * 0.1);
   }
@@ -435,17 +479,20 @@ export class Cosmos {
     if (strength < 0.02) return;
     const M = Math.max(this.w, this.h);
     const S = this.S;
-    const hue = stopsHue(clamp(this.intensity), [
-      [0, 205],
-      [0.4, 250],
-      [0.7, 292],
-      [1, 325],
-    ]);
+    // Real galaxy colours, with about a quarter of the music's mood blended in,
+    // so a calm song gives a cooler band and an intense one a warmer one.
+    const MOOD = 0.25;
+    const tint = (hue: number) => lerpHue(hue, this.hue, MOOD);
+    const cream = tint(40);
+    const blue = tint(215);
     const width = M * (0.09 + 0.11 * strength);
     const bend = Math.sin(this.t * 0.031) * 0.12;
     const wrap = (u: number) => ((((u + 1.2) % 2.4) + 2.4) % 2.4) - 1.2;
     const wave = (u: number) => (B.wave < 1.4 ? Math.exp(-Math.pow((Math.abs(u) - B.wave) / 0.14, 2)) * (1 - B.wave / 1.4) : 0);
-    const at = (u: number, v: number): [number, number] => [u * M * 0.75, v * width + bend * u * u * M * 0.25];
+    // Off-centre: the band sweeps across the sky beside the vanishing point
+    // rather than through it, so it never merges with the core into a flare.
+    const offset = M * (0.13 + 0.03 * Math.sin(this.t * 0.013));
+    const at = (u: number, v: number): [number, number] => [u * M * 0.75, offset + v * width + bend * u * u * M * 0.25];
     ctx.save();
     ctx.rotate(-0.42 + Math.sin(this.t * 0.02) * 0.15);
     // The glow: soft clouds of light, far ones dimmer.
@@ -455,19 +502,32 @@ export class Cosmos {
       // Clouds are stretched along the band, so it reads as one long river of light.
       const R = M * c.r * 0.6 * (0.8 + 0.5 * strength) * (0.75 + 0.25 * c.depth);
       const [x, y] = at(u, c.v);
-      ctx.globalAlpha = strength * 0.2 * edge * (0.6 + 0.4 * c.depth) * (1 + 1.5 * wave(u));
-      ctx.drawImage(this.puffSprite((hue + c.h * 40) % 360), x - R * 2.2, y - R * 0.6, R * 4.4, R * 1.2);
+      ctx.globalAlpha = strength * 0.13 * c.b * edge * (0.6 + 0.4 * c.depth) * (1 + 1.5 * wave(u));
+      // Warm cream light along the middle, cooler blue-white further out.
+      const warm = Math.exp(-c.v * c.v * 30);
+      ctx.drawImage(this.puffSprite(warm > 0.5 ? cream : blue, 28, 64), x - R * 2.2, y - R * 0.6, R * 4.4, R * 1.2);
     }
-    // Countless faint stars packed into it, thickest along its middle.
-    ctx.fillStyle = `hsl(${(hue + 30) % 360} 35% 88%)`;
+    // Countless faint stars packed into it, thickest along its middle:
+    // warm cream in the dense middle, blue-white towards the edges.
+    const creamStar = `hsl(${cream} 40% 90%)`;
+    const blueStar = `hsl(${blue} 35% 92%)`;
     for (const m of B.motes) {
       const u = wrap(m.u + B.flow * m.depth);
-      const a = strength * (0.3 + m.b * 0.7) * Math.exp(-m.v * m.v * 1.6) * clamp((1.2 - Math.abs(u)) / 0.3) * (1 + 2 * wave(u)) * (0.6 + 0.4 * m.depth);
+      const a = strength * (0.36 + m.b * 0.8) * Math.exp(-m.v * m.v * 1.6) * clamp((1.2 - Math.abs(u)) / 0.3) * (1 + 2 * wave(u)) * (0.6 + 0.4 * m.depth);
       if (a < 0.01) continue;
       const [x, y] = at(u, m.v * 1.2);
       const r = (0.9 + m.depth * 0.7 + m.b * 0.6) * S;
       ctx.globalAlpha = clamp(a);
+      ctx.fillStyle = m.warm ? creamStar : blueStar;
       ctx.fillRect(x, y, r, r);
+    }
+    // A few small, faint nebulae, like real star-forming regions: pink and blue.
+    for (const n of B.nebulae) {
+      const u = wrap(n.u + B.flow * n.depth);
+      const R = M * n.r * (0.8 + 0.4 * strength);
+      const [x, y] = at(u, n.v);
+      ctx.globalAlpha = strength * 0.22 * clamp((1.2 - Math.abs(u)) / 0.35);
+      ctx.drawImage(this.puffSprite(n.pink ? tint(340) : tint(200), 55, 62), x - R * 1.6, y - R, R * 3.2, R * 2);
     }
     // Dark dust lanes through it.
     ctx.globalCompositeOperation = 'destination-out';
@@ -475,8 +535,17 @@ export class Cosmos {
       const u = wrap(l.u + B.flow * l.depth);
       const R = M * l.r;
       const [x, y] = at(u, l.v);
-      ctx.globalAlpha = 0.3 * strength * clamp((1.2 - Math.abs(u)) / 0.35);
-      ctx.drawImage(this.puffSprite(0), x - R * 1.8, y - R * 0.5, R * 3.6, R);
+      ctx.globalAlpha = 0.45 * strength * clamp((1.2 - Math.abs(u)) / 0.35);
+      ctx.drawImage(this.puffSprite(0), x - R * l.stretch, y - R * 0.5, R * l.stretch * 2, R);
+    }
+    // ...and the dust itself, faintly brown where it blocks the light.
+    ctx.globalCompositeOperation = 'source-over';
+    for (const l of B.lanes) {
+      const u = wrap(l.u + B.flow * l.depth);
+      const R = M * l.r;
+      const [x, y] = at(u, l.v);
+      ctx.globalAlpha = 0.5 * strength * clamp((1.2 - Math.abs(u)) / 0.35);
+      ctx.drawImage(this.puffSprite(25, 40, 10), x - R * l.stretch, y - R * 0.5, R * l.stretch * 2, R);
     }
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 1;
@@ -551,7 +620,8 @@ export class Cosmos {
     for (const r of this.rings) r.z -= v * dt * 1.15;
     this.rings = this.rings.filter((r) => r.z > NEAR);
     this.waves = this.waves.filter((w) => (w.age += dt) < 0.9);
-    this.glints = this.glints.filter((g) => (g.life += dt) < g.max);
+    for (const st of this.stars) st.spark *= Math.exp(-dt * 7);
+    this.picks = this.picks.filter((pk) => (pk.life += dt) < pk.max);
     this.noteStars = this.noteStars.filter((st) => (st.age += dt) < st.life * 2.5);
     this.surge *= Math.exp(-dt * 6);
     this.kickFlash *= Math.exp(-dt * 7);
@@ -652,10 +722,17 @@ export class Cosmos {
       const x = st.x * s;
       const y = st.y * s;
       if (Math.abs(x) > w || Math.abs(y) > h) continue;
-      const a = (0.16 + st.bright * 0.45) * (0.75 + 0.25 * Math.sin(this.t * (0.5 + st.bright) + st.tw)) * (1 + 0.5 * this.beatFlash) + this.shimmer * 0.2;
-      const r = st.r * this.S * (0.6 + 25 / st.z);
-      ctx.fillStyle = `hsla(${st.hue} ${st.sat}% 88% / ${clamp(a)})`;
+      const a = (0.16 + st.bright * 0.45) * (0.75 + 0.25 * Math.sin(this.t * (0.5 + st.bright) + st.tw)) * (1 + 0.5 * this.beatFlash) + this.shimmer * 0.2 + st.spark * 0.9;
+      const r = st.r * this.S * (0.6 + 25 / st.z) * (1 + st.spark * 1.4);
+      ctx.fillStyle = `hsla(${st.hue} ${st.sat}% 90% / ${clamp(a)})`;
       ctx.fillRect(x - r / 2, y - r / 2, r, r);
+      // A twinkling star gets a soft halo for a moment.
+      if (st.spark > 0.15) {
+        const R = (2.5 + 4 * st.spark) * this.S;
+        ctx.globalAlpha = clamp(st.spark * 0.7);
+        ctx.drawImage(this.puffSprite(st.hue, Math.min(40, st.sat), 86), x - R * 2, y - R * 2, R * 4, R * 4);
+        ctx.globalAlpha = 1;
+      }
     }
     this.drawBand(ctx, f.dt);
     this.drawSights(ctx, F, live);
@@ -721,7 +798,7 @@ export class Cosmos {
       // Motes dissolve well before they reach you, so the nearest (largest) ones
       // stay soft background instead of pulling the eye.
       const fadeOut = Math.pow(clamp((m.z - NEAR) / 7), 1.5);
-      const a = Math.max(m.a, 0.55 * this.calm) * born * haze * fadeOut * (0.26 + live * 0.36) * (1 + 1.8 * flash) * (1 + 0.7 * this.beatFlash);
+      const a = Math.max(m.a, 0.55 * this.calm) * born * haze * fadeOut * (0.22 + live * 0.3) * (1 + 1.8 * flash) * (1 + 0.45 * this.beatFlash);
       const R = Math.max(0.6 * S, Math.min(15 * S, m.size * s * 0.75)) * (1 + 0.6 * flash);
       if (streak && m.seen) {
         ctx.strokeStyle = `hsla(${m.hue} 85% ${m.light}% / ${a * 0.4})`;
@@ -741,25 +818,7 @@ export class Cosmos {
     }
 
 
-    // The treble halo: crisp four-point glints around the edge of view.
     const M = Math.min(w, h);
-    for (const g of this.glints) {
-      const k = g.life / g.max;
-      const a = (1 - k) * (k < 0.15 ? k / 0.15 : 1);
-      const x = Math.cos(g.ang) * g.r * M * 1.15;
-      const y = Math.sin(g.ang) * g.r * M;
-      const L = (3 + 7 * g.size) * S * (1 - k * 0.4);
-      ctx.strokeStyle = `hsla(${(this.hue + 150) % 360} 60% 92% / ${a * 0.9})`;
-      ctx.lineWidth = 0.9 * S;
-      ctx.beginPath();
-      ctx.moveTo(x - L, y);
-      ctx.lineTo(x + L, y);
-      ctx.moveTo(x, y - L);
-      ctx.lineTo(x, y + L);
-      ctx.stroke();
-      ctx.fillStyle = `hsla(0 0% 100% / ${a})`;
-      ctx.fillRect(x - S, y - S, 2 * S, 2 * S);
-    }
 
     // Notes of keys and other note instruments: stars that bloom and fade.
     for (const st of this.noteStars) {
@@ -789,6 +848,46 @@ export class Cosmos {
       ctx.fill();
     }
 
+    // Guitar: pick strokes. Each is one hair-fine line of warm light swept
+    // across the view in a flash, in the direction of the stroke, drifting a
+    // little outward as it goes like a brush stroke. It tapers in and out,
+    // brightest just behind its leading edge, then fades away gently.
+    const pickHue = lerpHue(36, this.hue, 0.15);
+    ctx.lineCap = 'round';
+    for (const pk of this.picks) {
+      const k = pk.life / pk.max;
+      const drawn = 1 - Math.pow(1 - clamp(pk.life / 0.16), 3);
+      const fade = Math.pow(1 - k, 1.6) * pk.v;
+      const SEG = 28;
+      let px = 0;
+      let py = 0;
+      for (let i = 0; i <= SEG; i++) {
+        const u = (i / SEG) * drawn;
+        const a = pk.a0 + pk.dir * pk.span * u;
+        const R = (pk.r + pk.drift * u) * M;
+        const x = Math.cos(a) * R * 1.15;
+        const y = Math.sin(a) * R;
+        if (i > 0) {
+          // Soft at both ends: rises from the start, peaks near the head, eases off at the very tip.
+          const along = Math.sin(Math.PI * Math.pow(i / SEG, 0.8)) * 0.85 + 0.15 * (i / SEG);
+          ctx.strokeStyle = `hsla(${pickHue} 55% 78% / ${clamp(fade * along * 0.12)})`;
+          ctx.lineWidth = 3 * S;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          ctx.strokeStyle = `hsla(${pickHue} 50% 90% / ${clamp(fade * along * 0.8)})`;
+          ctx.lineWidth = 0.75 * S;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+        px = x;
+        py = y;
+      }
+    }
+
     // The melody line: a comet ahead, its trail drifting past you.
     const c = this.comet;
     if (c.lv > 0.02) {
@@ -801,11 +900,10 @@ export class Cosmos {
       const ty = 0.9 - pitch * 1.8;
       c.x += (tx - c.x) * 0.05;
       c.y += (ty - c.y) * 0.08;
-      if (Math.random() < 0.9) {
-        if (this.dust.length >= MAX_DUST) this.dust.shift();
-        this.dust.push({ x: c.x + (Math.random() - 0.5) * 0.05, y: c.y + (Math.random() - 0.5) * 0.05, z, size: 0.03 * (0.5 + c.lv) * (0.6 + 0.4 * c.voice), hue: cometHue, light: 74, a: 0.8 * c.lv, sx: 0, sy: 0, seen: false });
-      }
-      const R = (10 + 18 * c.lv) * S * (0.7 + 0.3 * c.voice);
+      // A soft glowing head leaving a trail of glowing dust that drifts past you.
+      if (this.dust.length >= MAX_DUST) this.dust.shift();
+      this.dust.push({ x: c.x + (Math.random() - 0.5) * 0.06, y: c.y + (Math.random() - 0.5) * 0.06, z, size: 0.05 * (0.5 + c.lv) * (0.7 + 0.3 * c.voice), hue: cometHue, light: 76, a: 0.85 * c.lv, sx: 0, sy: 0, seen: false });
+      const R = (18 + 30 * c.lv) * S * (0.8 + 0.2 * c.voice);
       ctx.globalAlpha = clamp(c.lv * 1.4);
       ctx.drawImage(this.sprites.get(cometHue + 2, 82), c.x * s - R * 2, c.y * s - R * 2, R * 4, R * 4);
       ctx.globalAlpha = 1;

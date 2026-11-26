@@ -12,11 +12,13 @@ listening to, settings and shortcuts.
   edges. The bass is the glowing core at the vanishing point, swelling with the bass. On every beat the
   whole field pulses: musicd follows the song's tempo and fires the pulse slightly ahead, so it is seen
   as the beat is heard. A kick sends a shockwave across space and a surge forward (the dust stretches
-  into streaks); a snare throws a faint ring of light that flies past you; hi-hats glint; cymbals
-  shimmer everything. The melody is a comet gliding ahead: warm when someone sings, cool when it is an
+  into streaks); a snare throws a faint ring of light that flies past you; hi-hats make the stars
+  twinkle; cymbals shimmer everything. A guitar strum sweeps a hair-fine stroke of warm light across
+  the view, like a pick stroke. The melody is a comet gliding ahead: warm when someone sings, cool when it is an
   instrument (a flute, a đàn bầu, a lead guitar). Notes of piano and other note instruments light
   stars around the centre, linked into constellations. Held sound (strings, pads, choirs) lights a Milky
-  Way band across the sky that flows past as you fly and glows brighter as the strings swell. Harmony
+  Way band, in real galaxy colours, across the sky that flows past as you fly and glows brighter as the
+  strings swell. Harmony
   colours the nebulae. Silence and gaps between songs settle into a slow, quiet float instead of being
   amplified.
 - **Debug mode** (in the panel, or press D): lists the parts musicd recognises right now (kick,
