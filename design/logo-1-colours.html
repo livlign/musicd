@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>musicd · Play piece, colour options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;650&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #030308; --panel: #0a0a12; --line: #1b1b28; --text: #e9e6f2; --muted: #8b88a0;
+    --brand: "Unbounded", ui-rounded, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ink); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .ink { --surface: #030308; --word: #ece8f6; background: var(--surface); }
+  .paper { --surface: #f1eee8; --word: #0d0c14; background: var(--surface); }
+
+  header { max-width: 1180px; margin: 0 auto; padding: 44px 28px 26px; display: grid; gap: 18px; }
+  h1 { font: 650 26px/1.2 var(--brand); letter-spacing: -0.03em; margin: 0; }
+  h1 span { color: var(--muted); font-weight: 500; }
+  header p { margin: 0; color: var(--muted); max-width: 720px; text-wrap: pretty; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button, .chk { font: inherit; font-size: 13px; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    display: inline-flex; gap: 8px; align-items: center; }
+  button:hover, .chk:hover { border-color: var(--muted); }
+  button.on { border-color: #b9a8ff; }
+  .chk input[type=checkbox] { margin: 0; accent-color: #9b7bff; }
+  .chk input[type=range] { width: 120px; accent-color: #9b7bff; }
+  .pill { font-size: 13px; padding: 7px 12px; border-radius: 999px; min-width: 140px; text-align: center;
+    background: #ffffff10; transition: .3s; }
+  .mood { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+  .mood i { width: 46px; height: 14px; border-radius: 99px; display: inline-block; }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 0 28px 20px; display: grid; gap: 20px; }
+  .board { display: grid; grid-template-columns: 380px 1fr; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 22px; overflow: hidden; }
+  .board.pick { border-color: #6f5fc8; }
+  .stage { display: grid; place-items: center; min-height: 380px; border-right: 1px solid var(--line); }
+  .stage svg { overflow: visible; }
+  .info { padding: 26px 30px; display: flex; flex-direction: column; gap: 12px; }
+  .title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .num { font: 650 13px/1 var(--brand); color: var(--ink); background: #d9d0ff; border-radius: 7px; padding: 5px 8px; }
+  .tag { font-size: 12px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .tag.rec { color: #c7b8ff; }
+  h2 { margin: 0; font: 650 22px/1.2 var(--brand); letter-spacing: -0.03em; }
+  .why { margin: 0; color: var(--muted); max-width: 660px; text-wrap: pretty; }
+  .swatches { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+  .swatches i { width: 22px; height: 22px; border-radius: 6px; display: inline-block; border: 1px solid #ffffff14; }
+
+  .kit { margin-top: auto; display: grid; grid-template-columns: auto auto 1fr; gap: 12px; }
+  .tile { border-radius: 14px; padding: 12px; border: 1px solid var(--line); }
+  .icons { display: flex; gap: 12px; }
+  .icons > div { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .icon { width: 96px; height: 96px; display: grid; place-items: center; border-radius: 22px; }
+  .icons small, .tabs small { font-size: 11px; color: var(--muted); }
+  .tabs { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .tab { display: flex; align-items: center; gap: 8px; background: #16161f; border-radius: 8px 8px 0 0;
+    padding: 6px 12px 6px 10px; font-size: 12px; color: #d0cde0; width: max-content; }
+  .tab.light { background: #e8e6e1; color: #2a2733; }
+  .tab svg { display: block; }
+  .lockups { display: grid; gap: 10px; }
+  .lockup { border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 12px 18px; border: 1px solid var(--line); }
+  .lockup b { font: 650 28px/1 var(--brand); letter-spacing: -0.045em; color: var(--word); }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 10px 0 44px; }
+  kbd { font: inherit; border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+  @media (max-width: 920px) { .board { grid-template-columns: 1fr; } .stage { border-right: 0; border-bottom: 1px solid var(--line); } .kit { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Play piece <span>· colour options</span></h1>
+    <p>The same mark in colours taken from Cosmos. The disc becomes a dark shape in space and the play wedge
+      becomes the light. In the live versions the wedge changes colour with the mood of the music, the way Cosmos
+      does: deep blue and cyan when it's chill, then violet and rose, then red and gold when it's intense.
+      App icons, favicons and the "static" lockup use one fixed version of each colour scheme.</p>
+  </div>
+  <div class="controls">
+    <span id="status" class="pill">♪ playing</span>
+    <button id="play" title="Space">Silence</button>
+    <button id="again" title="R">Reassemble</button>
+    <label class="chk"><input type="checkbox" id="auto" checked> Auto demo</label>
+    <label class="chk">chill <input type="range" id="intensity" min="0" max="1" step="0.01" value="0.55"> intense</label>
+    <label class="chk"><input type="checkbox" id="sweep" checked> Sweep the mood</label>
+    <button id="mic">Listen to mic</button>
+    <span class="mood">mood now <i id="moodSwatch"></i></span>
+  </div>
+</header>
+<main id="boards"></main>
+<footer><kbd>Space</kbd> play / silence · <kbd>R</kbd> reassemble · the auto demo plays 6 s, then 4 s of silence; the sweep moves the song from chill to intense and back over about 16 s</footer>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg', D = Math.PI / 180;
+const MAX_SPEED = 120, SPIN_UP = .7, COAST = 1.9;
+let uidN = 0; const uid = () => ++uidN;
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) { const v = attrs[k];
+    if (typeof v === 'string' && v.startsWith('var(')) e.style.setProperty(k, v); else e.setAttribute(k, v); }
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const f = n => (Math.round(n * 100) / 100).toString();
+const pol = (r, a) => [r * Math.sin(a * D), -r * Math.cos(a * D)];
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const ease = t => 1 - Math.pow(1 - clamp01(t), 3);
+const snap = t => { t = clamp01(t); const c = 1.5; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+const rng = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+const fade = (G, delay) => f(clamp01((G.asm - delay) * 4));
+function sector(r0, r1, a0, a1) {
+  const lg = a1 - a0 > 180 ? 1 : 0, [x0, y0] = pol(r1, a0), [x1, y1] = pol(r1, a1);
+  if (r0 <= 0) return `M0 0L${f(x0)} ${f(y0)}A${r1} ${r1} 0 ${lg} 1 ${f(x1)} ${f(y1)}Z`;
+  const [x2, y2] = pol(r0, a1), [x3, y3] = pol(r0, a0);
+  return `M${f(x0)} ${f(y0)}A${r1} ${r1} 0 ${lg} 1 ${f(x1)} ${f(y1)}L${f(x2)} ${f(y2)}A${r0} ${r0} 0 ${lg} 0 ${f(x3)} ${f(y3)}Z`;
+}
+const arc = (r, a0, a1) => { const [x0, y0] = pol(r, a0), [x1, y1] = pol(r, a1);
+  return `M${f(x0)} ${f(y0)}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${f(x1)} ${f(y1)}`; };
+
+/* Colour ramps copied from src/viz/cosmos.ts, so the logo moves through the same colours as the app. */
+function stopsHue(t, stops) {
+  t = clamp01(t);
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+    const [t0, h0] = stops[i - 1], [t1, h1] = stops[i], k = (t - t0) / (t1 - t0 || 1);
+    let dh = ((h1 - h0 + 540) % 360) - 180; return (h0 + dh * k + 360) % 360;
+  }
+  return stops[stops.length - 1][1];
+}
+const moodHue = i => stopsHue(i, [[0, 212], [.3, 236], [.5, 268], [.7, 312], [.85, 340], [1, 12]]);
+const warmHue = i => stopsHue(clamp01(i * 1.2 - .05), [[0, 195], [.35, 250], [.65, 318], [1, 38]]);
+const hsl = (h, s, l) => `hsl(${f(h)} ${f(s)}% ${f(l)}%)`;
+// Wedge colours for a mood: [centre (the bass core), rim (the space)].
+const moodPair = i => [hsl(warmHue(i), 60 + 35 * i, 72), hsl(moodHue(i), 55 + 30 * i, 58)];
+
+const DARK = { disc: '#121222', groove: 'rgba(255,255,255,.07)', rim: 'rgba(190,180,255,.30)' };
+const VARIANTS = [
+  { name: 'Mood', rec: true, ...DARK, live: true, glow: true,
+    pair: I => moodPair(I), still: () => moodPair(.55),
+    why: 'The wedge follows the music the way Cosmos does. When it’s silent it sits out in calm blue and cyan; once a song plays it clicks in and moves from violet towards rose and gold as the song gets more intense. The fixed version (violet to rose) is the brand colour for icons and print. This is the closest match to the app.' },
+  { name: 'Mood + light in the cracks', ...DARK, live: true, glow: true, leak: true,
+    pair: I => moodPair(I), still: () => moodPair(.55),
+    why: 'Same as Mood, but while music plays, light in the wedge\u2019s colour glows along every crack and around the rim, pulsing on each beat, so the whole record lights up from inside. In silence the light goes out and it looks exactly like A. Icons and favicons are the same as A.' },
+  { name: 'Cool', ...DARK, glow: true,
+    pair: () => [hsl(190, 85, 72), hsl(245, 70, 62)], still: () => [hsl(190, 85, 72), hsl(245, 70, 62)],
+    why: 'Always cyan to indigo: the colours of a calm Cosmos. Quiet and technical, and the most readable on dark backgrounds, but it never shows the warm, intense side of the app.' },
+  { name: 'Warm', ...DARK, glow: true,
+    pair: () => [hsl(42, 95, 66), hsl(338, 78, 60)], still: () => [hsl(42, 95, 66), hsl(338, 78, 60)],
+    why: 'Always gold to rose: Cosmos at its peak, like the bass core on a big drop. Warm and energetic, and it stands out best in a row of browser tabs, but it loses the blue and violet the app shows most of the time.' },
+  { name: 'Round 2, for reference', disc: '#f3d9a8', groove: 'rgba(3,3,8,.4)', rim: null,
+    pair: () => ['#ff9a3c', '#ff9a3c'], still: () => ['#ff9a3c', '#ff9a3c'],
+    why: 'The cream and orange version from the last page, for comparison. Bold as a sticker, but it reads as print rather than light, and neither colour is one Cosmos uses much.' },
+];
+
+function playPiece(svg, V, isStatic) {
+  const id = uid(), R = rng(4), root = el('g', {}, svg), P = [];
+  const defs = el('defs', {}, svg);
+  const grad = el('radialGradient', { id: `w${id}`, cx: 0, cy: 0, r: 100, gradientUnits: 'userSpaceOnUse' }, defs);
+  const s0 = el('stop', { offset: '.08' }, grad), s1 = el('stop', { offset: '1' }, grad);
+  const blur = el('filter', { id: `b${id}`, x: '-60%', y: '-60%', width: '220%', height: '220%' }, defs);
+  el('feGaussianBlur', { stdDeviation: 9 }, blur);
+  const paint = `url(#w${id})`;
+
+  const GAP = 3;
+  const piece = (parent, a0, a1, fill) => {
+    const g = el('g', {}, parent);
+    el('path', { d: sector(0, 100, a0, a1), fill }, g);
+    for (const r of [64, 82]) { const pad = (GAP / r) / D;
+      el('path', { d: arc(r, a0 + pad, a1 - pad), fill: 'none', stroke: V.groove, 'stroke-width': 1.5 }, g); }
+    if (V.rim) el('path', { d: arc(99.3, a0 + .9, a1 - .9), fill: 'none', stroke: V.rim, 'stroke-width': 1.4 }, g);
+    el('path', { d: sector(0, 100, a0, a1), fill: 'none', stroke: 'var(--surface)', 'stroke-width': GAP, 'stroke-linejoin': 'round' }, g);
+    return g;
+  };
+  const cuts = [305, 371, 432, 493, 548, 595];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const g = piece(root, cuts[i], cuts[i + 1], V.disc);
+    const [dx, dy] = pol(110 + R() * 60, (cuts[i] + cuts[i + 1]) / 2 + (R() - .5) * 40);
+    P.push({ g, dx, dy, rot: (R() - .5) * 120, delay: .08 + i * .08 });
+  }
+  // Variant "leak": light along every crack and the rim, glowing with the music.
+  let leak = null;
+  if (V.leak) {
+    leak = el('g', { opacity: 0 }, root);
+    const lines = (g, w) => {
+      for (const a of [...cuts, 235]) { const [x0, y0] = pol(7, a), [x1, y1] = pol(100, a);
+        el('line', { x1: f(x0), y1: f(y0), x2: f(x1), y2: f(y1), stroke: paint, 'stroke-width': w, 'stroke-linecap': 'round' }, g); }
+      el('circle', { r: 100, fill: 'none', stroke: paint, 'stroke-width': w * .7 }, g);
+    };
+    lines(el('g', { filter: `url(#b${id})`, opacity: .9 }, leak), 9);
+    lines(el('g', {}, leak), 2.2);
+  }
+  const wedgeWrap = el('g', {}, root);
+  const halo = V.glow ? el('path', { d: sector(0, 96, 238, 302), fill: paint, filter: `url(#b${id})`, opacity: 0 }, wedgeWrap) : null;
+  const wedge = el('g', {}, wedgeWrap);
+  el('path', { d: sector(0, 100, 235, 305), fill: paint }, wedge);
+  for (const r of [64, 82]) { const pad = (GAP / r) / D;
+    el('path', { d: arc(r, 235 + pad, 305 - pad), fill: 'none', stroke: 'rgba(3,3,8,.22)', 'stroke-width': 1.5 }, wedge); }
+  el('path', { d: sector(0, 100, 235, 305), fill: 'none', stroke: 'var(--surface)', 'stroke-width': GAP, 'stroke-linejoin': 'round' }, wedge);
+  el('circle', { r: 5.5, fill: 'var(--surface)' }, root);
+
+  return G => {
+    if (isStatic) G = STILL;
+    const [c0, c1] = isStatic || !V.live ? V.still() : V.pair(G.mood);
+    s0.setAttribute('stop-color', c0); s1.setAttribute('stop-color', c1);
+    root.setAttribute('transform', `rotate(${f(G.angle)})`);
+    for (const p of P) {
+      const k = snap((G.asm - p.delay) / .8), q = 1 - k;
+      p.g.setAttribute('transform', `translate(${f(p.dx * q)} ${f(p.dy * q)}) rotate(${f(p.rot * q)})`);
+      p.g.setAttribute('opacity', fade(G, p.delay));
+    }
+    const k = snap((G.asm - .75) / .7), out = (1 - k) * 150 + 34 * G.apart * k;
+    wedgeWrap.setAttribute('transform', `translate(${f(-out)} 0)`);
+    wedgeWrap.setAttribute('opacity', fade(G, .75));
+    if (halo) halo.setAttribute('opacity', f(isStatic ? 0 : (.25 + .35 * G.play + .3 * G.beat * G.play)));
+    if (leak) leak.setAttribute('opacity', f(isStatic ? 0 : clamp01((G.asm - 1.2) * 2) * G.play * (.3 + .45 * G.level + .35 * G.beat)));
+  };
+}
+const STILL = { asm: 99, angle: 0, apart: 0, play: 1, beat: 0, level: .6, mood: .55 };
+
+/* ───────── boards ───────── */
+const updates = [];
+const mount = (host, size, V, isStatic = false) => {
+  const svg = el('svg', { viewBox: '-120 -120 240 240', width: size, height: size, role: 'img' }, host);
+  // At favicon size a near-black disc vanishes on a dark tab, so small marks get a lifted disc.
+  if (size <= 24 && V.rim) V = { ...V, disc: '#34345a', rim: 'rgba(210,200,255,.6)' };
+  updates.push(playPiece(svg, V, isStatic));
+};
+const boards = document.getElementById('boards');
+VARIANTS.forEach((V, i) => {
+  const b = document.createElement('section');
+  b.className = 'board' + (V.rec ? ' pick' : '');
+  const [a, c] = V.still();
+  b.innerHTML = `
+    <div class="stage ink"></div>
+    <div class="info">
+      <div class="title"><span class="num">${String.fromCharCode(65 + i)}</span><h2>${V.name}</h2>
+        ${V.rec ? '<span class="tag rec">my pick</span>' : ''}${V.live ? '<span class="tag">changes with the mood</span>' : ''}</div>
+      <p class="why">${V.why}</p>
+      <div class="swatches">fixed colours <i style="background:${V.disc}"></i><i style="background:${a}"></i><i style="background:${c}"></i>
+        <i style="background:radial-gradient(circle at 100% 50%, ${a}, ${c})"></i></div>
+      <div class="kit">
+        <div class="tile ink icons">
+          <div><div class="icon" style="background:#0d0d18"></div><small>app icon</small></div>
+          <div><div class="icon paper"></div><small>on light</small></div>
+        </div>
+        <div class="tile ink tabs">
+          <div class="tab"><span class="f1"></span>musicd</div>
+          <div class="tab light paper"><span class="f2"></span>musicd</div>
+          <small>favicons, 16 px</small>
+        </div>
+        <div class="lockups">
+          <div class="lockup ink"><span class="lk"></span><b>musicd</b></div>
+          <div class="lockup paper"><span class="lk2"></span><b>musicd</b></div>
+        </div>
+      </div>
+    </div>`;
+  boards.appendChild(b);
+  mount(b.querySelector('.stage'), 290, V);
+  b.querySelectorAll('.icon').forEach(e => mount(e, 72, V, true));
+  mount(b.querySelector('.f1'), 16, V, true);
+  mount(b.querySelector('.f2'), 16, V, true);
+  mount(b.querySelector('.lk'), 40, V);
+  mount(b.querySelector('.lk2'), 40, V, true);
+});
+
+/* ───────── playback ───────── */
+const qs = new URLSearchParams(location.search);
+const G = { t: 0, dt: 0, asm: +(qs.get('asm') || 0), angle: 0, speed: 0, play: 1, apart: 0, level: 0, beat: 0,
+  mood: 0, braking: false, remain: 0, brakeA: 0 };
+let manualPlaying = true, mic = null;
+const $ = id => document.getElementById(id);
+const autoBox = $('auto'), status = $('status'), slider = $('intensity'), sweep = $('sweep');
+if (qs.has('silent')) { autoBox.checked = false; manualPlaying = false; G.play = 0; G.apart = 1; }
+if (qs.has('mood')) { sweep.checked = false; slider.value = qs.get('mood'); G.mood = +slider.value; }
+slider.oninput = () => { sweep.checked = false; };
+
+function isPlaying() {
+  if (mic) return G.t - mic.lastSound < 1.2;
+  if (autoBox.checked) return (G.t % 10) < 6;
+  return manualPlaying;
+}
+$('play').onclick = () => { manualPlaying = !isPlaying(); autoBox.checked = false; };
+$('again').onclick = () => { G.asm = 0; G.speed = 0; G.angle = 0; };
+autoBox.onchange = () => { manualPlaying = true; };
+$('mic').onclick = async () => {
+  if (mic) { mic.stream.getTracks().forEach(t => t.stop()); mic.ctx.close(); mic = null;
+    $('mic').classList.remove('on'); $('mic').textContent = 'Listen to mic'; return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const ctx = new AudioContext(), an = ctx.createAnalyser();
+    an.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(an);
+    mic = { stream, ctx, an, buf: new Float32Array(an.fftSize), fast: 0, slow: 0, lastSound: -99, loud: 0 };
+    $('mic').classList.add('on'); $('mic').textContent = 'Stop mic';
+  } catch (e) { alert('Could not open the microphone: ' + e.message); }
+};
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'range') return;
+  if (e.code === 'Space') { e.preventDefault(); $('play').click(); }
+  else if (e.key === 'r' || e.key === 'R') $('again').click();
+});
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  G.dt = dt; G.t += dt; G.asm += dt;
+  let songMood;
+  if (mic) {
+    mic.an.getFloatTimeDomainData(mic.buf);
+    let s = 0; for (const v of mic.buf) s += v * v;
+    const rms = Math.sqrt(s / mic.buf.length);
+    mic.fast += (rms - mic.fast) * .5; mic.slow += (rms - mic.slow) * .04;
+    if (rms > .008) mic.lastSound = G.t;
+    G.level = clamp01(rms * 10);
+    G.beat = mic.fast > mic.slow * 1.45 && mic.fast > .02 ? 1 : G.beat * Math.exp(-dt / .12);
+    mic.loud += (clamp01(rms * 6) - mic.loud) * (1 - Math.exp(-dt / 2));
+    songMood = mic.loud;
+  } else {
+    if (sweep.checked) slider.value = (.5 - .5 * Math.cos(G.t / 16 * Math.PI * 2)).toFixed(2);
+    songMood = +slider.value;
+  }
+  const playing = isPlaying();
+  if (playing) {
+    G.braking = false;
+    if (G.asm > 1.2) G.speed = Math.min(MAX_SPEED, G.speed + MAX_SPEED / SPIN_UP * dt);
+    G.angle = (G.angle + G.speed * dt) % 360;
+  } else if (G.speed > 0) {
+    if (!G.braking) {
+      const v = G.speed, minD = v * v / (2 * (MAX_SPEED / COAST));
+      let d = (360 - G.angle % 360) % 360; while (d < minD) d += 360;
+      G.remain = d; G.brakeA = v * v / (2 * d); G.braking = true;
+    }
+    const step = Math.min(G.remain, G.speed * dt);
+    G.angle += step; G.remain -= step; G.speed = Math.max(0, G.speed - G.brakeA * dt);
+    if (G.remain <= .05 || G.speed === 0) { G.speed = 0; G.angle = 0; }
+  }
+  G.play += ((playing ? 1 : 0) - G.play) * (1 - Math.exp(-4 * dt));
+  G.apart += ((playing ? 0 : 1) - G.apart) * (1 - Math.exp(-(playing ? 9 : 1.4) * dt));
+  // Like Cosmos: mood rises over a few seconds and settles back slowly to calm blue in silence.
+  const target = playing ? songMood : 0;
+  G.mood += (target - G.mood) * (1 - Math.exp(-dt / (target > G.mood ? 1.5 : 3)));
+  if (!mic) {
+    const b = Math.exp(-(G.t % .5) / .09);
+    G.beat = b * G.play;
+    G.level = G.play * (.55 + .2 * Math.sin(G.t * 1.7) + .25 * b);
+  }
+  const [mc0, mc1] = moodPair(G.mood);
+  $('moodSwatch').style.background = `linear-gradient(90deg, ${mc0}, ${mc1})`;
+  status.textContent = (playing ? '♪ playing' : 'silence') + (mic ? ' · mic' : autoBox.checked ? ' · demo' : '');
+  status.style.color = playing ? mc1 : '#8b88a0';
+  $('play').textContent = playing ? 'Silence' : 'Play';
+  for (const u of updates) u(G);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

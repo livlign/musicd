@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>musicd · ideas for the sustained-sound visual</title>
+<style>
+  :root { --bg: #030308; --panel: #0a0b14; --line: #1a1c2c; --text: #e6e9f5; --muted: #8b90aa; --cyan: #8fe8ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { max-width: 1240px; margin: 0 auto; padding: 40px 28px 22px; display: grid; gap: 16px; }
+  h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; font-weight: 650; }
+  h1 span { color: var(--muted); font-weight: 400; }
+  header p { margin: 0; color: var(--muted); max-width: 760px; text-wrap: pretty; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 13px; }
+  .controls label { display: inline-flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+  .controls input[type=range] { width: 130px; accent-color: #8a7cff; }
+  .controls input[type=checkbox] { accent-color: #8a7cff; margin: 0; }
+  .meter { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); }
+  .meter i { display: inline-block; width: 120px; height: 6px; border-radius: 9px; background: #1a1c2c; overflow: hidden; }
+  .meter b { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), #8a7cff); }
+  main { max-width: 1240px; margin: 0 auto; padding: 0 28px 40px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.ref { opacity: 0.85; }
+  canvas { display: block; width: 100%; aspect-ratio: 16 / 10; background: #020208; }
+  .info { padding: 14px 18px 18px; }
+  .head { display: flex; gap: 10px; align-items: baseline; }
+  .letter { font-weight: 700; font-size: 12px; color: var(--bg); background: #cfd6ff; border-radius: 6px; padding: 0 7px; }
+  .ref .letter { background: #555b78; color: var(--text); }
+  h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+  .info p { margin: 6px 0 0; color: var(--muted); font-size: 14px; text-wrap: pretty; }
+  .fit { margin-top: 8px !important; font-size: 13px !important; color: #b6bdd8 !important; }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 0 0 40px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>The sustained-sound visual <span>· new ideas for the curtain</span></h1>
+    <p>This layer shows held, tonal sound: strings, pads, choirs, sustained notes. It should swell with them,
+      stay faint under drum-led music, and feel like part of deep space rather than a sheet hung in front of it.
+      Each panel is a small Cosmos (stars and incoming dust) with one idea. The last one is today's curtain, for comparison.</p>
+  </div>
+  <div class="controls">
+    <label><input type="checkbox" id="auto" checked> Auto swell</label>
+    <label>Sustained sound <input type="range" id="amount" min="0" max="1" step="0.01" value="0.6"></label>
+    <label>Mood: chill <input type="range" id="mood" min="0" max="1" step="0.01" value="0.45"> intense</label>
+    <span class="meter">now <i><b id="bar"></b></i></span>
+  </div>
+</header>
+<main id="grid"></main>
+<footer>The auto swell rises over about 5 s, holds, then fades, like a string section entering and leaving.</footer>
+
+<script>
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const TAU = Math.PI * 2;
+// The app's mood colours (src/viz/cosmos.ts): chill blue → violet → magenta → rose.
+function stopsHue(t, stops) {
+  t = clamp(t);
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+    const [t0, h0] = stops[i - 1], [t1, h1] = stops[i], k = (t - t0) / (t1 - t0 || 1);
+    return (h0 + (((h1 - h0 + 540) % 360) - 180) * k + 360) % 360;
+  }
+  return stops[stops.length - 1][1];
+}
+const moodHue = (i) => stopsHue(i, [[0, 212], [0.3, 236], [0.5, 268], [0.7, 312], [0.85, 340], [1, 12]]);
+const layerHue = (i) => stopsHue(i, [[0, 200], [0.4, 250], [0.7, 295], [1, 330]]);
+let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+/** Soft round puff with no bright core. */
+const puffCache = new Map();
+function puff(hue, sat = 70, light = 58) {
+  const key = `${Math.round(hue / 6) * 6}|${sat}|${light}`;
+  let c = puffCache.get(key);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    for (let i = 0; i <= 6; i++) { const u = i / 6; gr.addColorStop(u, `hsla(${hue} ${sat}% ${light}% / ${(0.5 * Math.exp(-u * u * 4.5)).toFixed(3)})`); }
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); puffCache.set(key, c);
+  }
+  return c;
+}
+
+/** A little Cosmos behind every idea: background stars and dust drifting towards you. */
+function makeBackdrop() {
+  const stars = Array.from({ length: 160 }, () => ({ x: rnd(), y: rnd(), b: Math.pow(rnd(), 2.4), tw: rnd() * 6 }));
+  const dust = Array.from({ length: 140 }, () => ({ a: rnd() * TAU, r: 0.2 + rnd() * 2.6, z: 2 + rnd() * 30, h: rnd() }));
+  return (g, w, h, t, dt, hue) => {
+    g.globalCompositeOperation = 'source-over';
+    g.fillStyle = '#020208'; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'lighter';
+    for (const s of stars) {
+      g.fillStyle = `hsla(220 20% 88% / ${(0.15 + s.b * 0.45) * (0.75 + 0.25 * Math.sin(t * 0.8 + s.tw))})`;
+      g.fillRect(s.x * w, s.y * h, 1 + s.b, 1 + s.b);
+    }
+    const F = Math.min(w, h) * 0.85;
+    for (const d of dust) {
+      d.z -= dt * 3; if (d.z < 0.6) { d.z = 30; d.a = rnd() * TAU; d.r = 0.2 + rnd() * 2.6; }
+      const s = F / d.z, x = w / 2 + Math.cos(d.a) * d.r * s, y = h / 2 + Math.sin(d.a) * d.r * s;
+      const a = clamp((30 - d.z) / 8) * clamp((d.z - 0.6) / 5) * 0.45, R = clamp(0.012 * s, 0.6, 6);
+      g.globalAlpha = a; g.drawImage(puff((hue + 40 + d.h * 80) % 360, 85, 70), x - R * 2, y - R * 2, R * 4, R * 4);
+    }
+    g.globalAlpha = 1;
+  };
+}
+
+/* ───────── A · Nebula veil ───────── */
+function veil() {
+  const arms = [0, 1, 2].map((i) => ({ ang: i * 2.09, phase: i * 1.7, off: (i - 1) * 22 }));
+  return (g, w, h, t, dt, s, mood) => {
+    const M = Math.min(w, h), hue = layerHue(mood);
+    g.save(); g.translate(w / 2, h / 2); g.rotate(t * 0.01);
+    for (const arm of arms) {
+      arm.phase += dt * 0.07;
+      for (let k = 0; k < 16; k++) {
+        const u = k / 15, ang = arm.ang + u * 2.4 + arm.phase * 0.35, r = M * (0.12 + u * 0.62) * (0.85 + 0.3 * s);
+        const patch = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(u * 7.3 - arm.phase * 1.6 + arm.off), 2);
+        const a = s * 0.32 * patch * (1 - u * 0.55); if (a < 0.004) continue;
+        const R = M * (0.1 + u * 0.16) * (0.8 + 0.5 * s);
+        g.globalAlpha = a; g.drawImage(puff((hue + arm.off + u * 24 + 360) % 360), Math.cos(ang) * r * 1.2 - R, Math.sin(ang) * r * 0.8 - R, R * 2, R * 2);
+      }
+    }
+    g.restore(); g.globalAlpha = 1;
+  };
+}
+
+/* ───────── B · Silk streams ───────── */
+function silk() {
+  const ribbons = Array.from({ length: 5 }, (_, i) => ({ a: (i / 5) * TAU + rnd() * 0.5, twist: 0.6 + rnd() * 0.6, off: rnd() * 10, hue: (i - 2) * 14 }));
+  return (g, w, h, t, dt, s, mood) => {
+    const M = Math.min(w, h), hue = layerHue(mood), n = Math.round(2 + s * 3);
+    g.save(); g.translate(w / 2, h / 2); g.lineCap = 'butt';
+    for (let i = 0; i < n; i++) {
+      const rb = ribbons[i];
+      // A ribbon of light flowing from the vanishing point past you, gently twisting.
+      let px = 0, py = 0;
+      for (let k = 1; k <= 90; k++) {
+        const u = k / 90, depth = Math.pow(u, 1.6);
+        const ang = rb.a + Math.sin(t * 0.15 + rb.off) * 0.4 + depth * rb.twist;
+        const r = M * (0.02 + depth * 0.85);
+        const x = Math.cos(ang) * r * 1.25, y = Math.sin(ang) * r * 0.85;
+        // Bright bands travel outwards along the ribbon, like the sound flowing past.
+        const flow = 0.4 + 0.6 * Math.pow(0.5 + 0.5 * Math.sin(u * 14 - t * 1.6 + rb.off), 3);
+        const a = s * 0.16 * flow * Math.sin(Math.PI * clamp(u * 1.15));
+        if (k > 1 && a > 0.004) {
+          g.strokeStyle = `hsla(${(hue + rb.hue + u * 30 + 360) % 360} 75% 66% / ${a})`;
+          g.lineWidth = 1 + depth * M * 0.05 * (0.6 + s);
+          g.beginPath(); g.moveTo(px, py); g.lineTo(x, y); g.stroke();
+        }
+        px = x; py = y;
+      }
+    }
+    g.restore();
+  };
+}
+
+/* ───────── C · Halo rings ───────── */
+function halo() {
+  const rings = [0, 1, 2, 3].map((i) => ({ r: 0.22 + i * 0.075, tilt: 0.35 + i * 0.07, spin: (i % 2 ? -1 : 1) * (0.05 + i * 0.015), ph: rnd() * TAU, hue: i * 12 }));
+  return (g, w, h, t, dt, s, mood) => {
+    const M = Math.min(w, h), hue = layerHue(mood), n = Math.round(1 + s * 3);
+    g.save(); g.translate(w / 2, h / 2); g.rotate(-0.25 + Math.sin(t * 0.05) * 0.05);
+    for (let i = 0; i < n; i++) {
+      const rg = rings[i]; rg.ph += dt * rg.spin;
+      const R = M * rg.r * (0.9 + 0.15 * s), ry = R * rg.tilt;
+      // A faint ring around the path ahead, its light gathered in slow-moving arcs.
+      for (let k = 0; k < 72; k++) {
+        const a0 = (k / 72) * TAU, a1 = ((k + 1) / 72) * TAU;
+        const glow = Math.pow(0.5 + 0.5 * Math.sin(a0 * 2 + rg.ph * 3), 2) * 0.8 + 0.2;
+        const front = 0.55 + 0.45 * Math.sin(a0); // the near half a little brighter
+        const a = s * 0.28 * glow * front; if (a < 0.004) continue;
+        g.strokeStyle = `hsla(${(hue + rg.hue + 360) % 360} 70% 68% / ${a})`;
+        for (const [lw, f] of [[M * 0.03, 0.25], [M * 0.008, 1]]) {
+          g.globalAlpha = f; g.lineWidth = lw;
+          g.beginPath(); g.ellipse(0, 0, R, ry, 0, a0, a1); g.stroke();
+        }
+      }
+    }
+    g.restore(); g.globalAlpha = 1;
+  };
+}
+
+/* ───────── D · Milky Way band ───────── */
+function milkyWay() {
+  const motes = Array.from({ length: 900 }, () => ({ u: rnd() * 2 - 1, v: (rnd() + rnd() + rnd() - 1.5) / 1.5, b: rnd() }));
+  const clouds = Array.from({ length: 26 }, () => ({ u: rnd() * 2.2 - 1.1, v: (rnd() - 0.5) * 0.5, r: 0.08 + rnd() * 0.12, h: rnd() }));
+  const lanes = Array.from({ length: 10 }, () => ({ u: rnd() * 2 - 1, v: (rnd() - 0.5) * 0.2, r: 0.05 + rnd() * 0.08 }));
+  return (g, w, h, t, dt, s, mood) => {
+    const M = Math.max(w, h), hue = layerHue(mood);
+    g.save(); g.translate(w / 2, h / 2); g.rotate(-0.42 + t * 0.006);
+    const width = M * (0.1 + 0.12 * s);
+    // The glow of the band: soft clouds of light along a line across the sky.
+    for (const c of clouds) {
+      const R = M * c.r * (0.8 + 0.6 * s);
+      g.globalAlpha = s * 0.22; g.drawImage(puff((hue + c.h * 40) % 360, 55, 62), c.u * M * 0.7 - R, c.v * width - R, R * 2, R * 2);
+    }
+    // Countless faint stars packed into it.
+    for (const m of motes) {
+      const a = s * (0.2 + m.b * 0.5) * Math.exp(-m.v * m.v * 1.5);
+      g.globalAlpha = 1; g.fillStyle = `hsla(${(hue + 30) % 360} 30% 85% / ${a})`;
+      g.fillRect(m.u * M * 0.7, m.v * width * 1.2, 1.1, 1.1);
+    }
+    // Dark dust lanes through it.
+    g.globalCompositeOperation = 'destination-out';
+    for (const l of lanes) {
+      const R = M * l.r; g.globalAlpha = 0.35 * s;
+      g.drawImage(puff(0, 0, 0), l.u * M * 0.7 - R * 1.8, l.v * width - R * 0.5, R * 3.6, R);
+    }
+    g.restore(); g.globalAlpha = 1; g.globalCompositeOperation = 'lighter';
+  };
+}
+
+/* ───────── E · Corona loops ───────── */
+function corona() {
+  const loops = Array.from({ length: 14 }, (_, i) => ({ a: (i / 14) * TAU + rnd() * 0.3, span: 0.25 + rnd() * 0.35, hgt: 0.5 + rnd() * 0.8, ph: rnd() * TAU, sp: 0.3 + rnd() * 0.5 }));
+  return (g, w, h, t, dt, s, mood) => {
+    const M = Math.min(w, h), hue = layerHue(mood), n = Math.round(4 + s * 10), r0 = M * 0.1;
+    g.save(); g.translate(w / 2, h / 2); g.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const L = loops[i]; L.ph += dt * L.sp;
+      // A loop of glowing filament rising from around the core and arcing back, like the sun's corona.
+      const a0 = L.a - L.span / 2, a1 = L.a + L.span / 2;
+      const lift = M * (0.12 + 0.22 * L.hgt) * (0.6 + 0.6 * s) * (0.85 + 0.15 * Math.sin(L.ph));
+      const x0 = Math.cos(a0) * r0, y0 = Math.sin(a0) * r0, x1 = Math.cos(a1) * r0, y1 = Math.sin(a1) * r0;
+      const cx = Math.cos(L.a) * (r0 + lift * 1.4), cy = Math.sin(L.a) * (r0 + lift * 1.4);
+      const a = s * (0.35 + 0.25 * Math.sin(L.ph * 1.7));
+      for (const [lw, f] of [[M * 0.022, 0.12], [M * 0.006, 0.45], [1, 0.9]]) {
+        g.strokeStyle = `hsla(${(hue + i * 5) % 360} 80% ${lw === 1 ? 85 : 62}% / ${a * f})`;
+        g.lineWidth = lw; g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(cx, cy, x1, y1); g.stroke();
+      }
+      // Light running along the filament.
+      const u = (L.ph * 0.3) % 1, px = (1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * cx + u * u * x1, py = (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * cy + u * u * y1;
+      const R = M * 0.02; g.globalAlpha = a; g.drawImage(puff(hue, 80, 75), px - R, py - R, R * 2, R * 2); g.globalAlpha = 1;
+    }
+    g.restore();
+  };
+}
+
+/* ───────── today · the curtain ───────── */
+function curtain() {
+  const cur = [0, 1].map((i) => ({ phase: i * 2.6, drift: 0.05 + i * 0.04, y: 0.16 + i * 0.16, off: (i - 0.5) * 40 }));
+  const hash = (x) => { const s = Math.sin(x * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  return (g, w, h, t, dt, s, mood) => {
+    const hue0 = layerHue(mood), step = 3;
+    for (const a of cur) {
+      a.phase += dt * 0.2 * (0.7 + a.drift * 6);
+      const hue = (hue0 + a.off + 360) % 360, len = h * (0.14 + s * 0.26), top0 = h * a.y;
+      for (let x = 0; x < w; x += step) {
+        const u = x / w, top = top0 + Math.sin(u * 2.3 + a.phase) * h * 0.09 + Math.sin(u * 5.7 - a.phase * 0.7) * h * 0.03;
+        const patch = clamp(0.5 + 0.5 * Math.sin(u * 5.3 + a.phase * 1.3) * Math.sin(u * 2.2 - a.phase * 0.5 + a.off));
+        const n1 = hash(Math.floor(x / step) * 1.7 + a.off), ray = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(n1 * 40 + a.phase * (0.8 + n1)), 2);
+        const al = s * patch * ray * 0.6; if (al < 0.01) continue;
+        const gr = g.createLinearGradient(0, top, 0, top + len);
+        gr.addColorStop(0, `hsla(${hue} 85% 72% / ${al})`); gr.addColorStop(0.35, `hsla(${hue + 15} 80% 60% / ${al * 0.5})`); gr.addColorStop(1, `hsla(${hue + 30} 75% 45% / 0)`);
+        g.fillStyle = gr; g.fillRect(x, top, step * 1.3, len * (0.6 + 0.7 * hash(x * 3.1 + 7)));
+      }
+    }
+  };
+}
+
+const IDEAS = [
+  { key: 'A', name: 'Nebula veil', make: veil,
+    desc: 'Glowing gas in soft puffs, spiralling slowly round the path ahead. Held sound thickens and widens it.',
+    fit: 'Fits: it is what space actually looks like, and it stays soft and behind everything. Risk: subtle; light strings may barely show.' },
+  { key: 'B', name: 'Silk streams', make: silk,
+    desc: 'A few ribbons of light flowing out of the vanishing point and past you, twisting gently, with brightness travelling along them. More held sound, more and wider ribbons.',
+    fit: 'Fits: it moves with the flight, so it feels like you are travelling through the music. Risk: busier; it competes a little with the dust.' },
+  { key: 'C', name: 'Halo rings', make: halo,
+    desc: 'Faint tilted rings around the path ahead, like a planet’s rings seen from inside, their light gathered in arcs that turn slowly. Each layer of sound adds a ring.',
+    fit: 'Fits: echoes the record in the logo and frames the centre. Risk: geometric; could feel like an interface element if too bright.' },
+  { key: 'D', name: 'Milky Way band', make: milkyWay,
+    desc: 'A band of countless faint stars and soft light across the sky, with dark dust lanes, that brightens and widens with held sound.',
+    fit: 'Fits: the most natural, calm and deep. Risk: static; it changes brightness rather than moving, so it reads as background.' },
+  { key: 'E', name: 'Corona loops', make: corona,
+    desc: 'Loops of glowing filament rising from around the bass core and arcing back, like the sun’s corona, with light running along them. Held sound raises more and taller loops.',
+    fit: 'Fits: ties the sustained sound to the core, so the centre feels alive. Risk: it crowds the middle, where the dust and comet already are.' },
+  { key: '·', name: 'Today: the curtain', make: curtain, ref: true,
+    desc: 'The current aurora: sheets of fine vertical rays hanging from flowing curves.',
+    fit: 'For comparison: flat and striped, it sits in front of space instead of in it.' },
+];
+
+const grid = document.getElementById('grid');
+const scenes = IDEAS.map((idea) => {
+  const card = document.createElement('article');
+  card.className = 'card' + (idea.ref ? ' ref' : '');
+  card.innerHTML = `<canvas></canvas><div class="info"><div class="head"><span class="letter">${idea.key}</span><h2>${idea.name}</h2></div><p>${idea.desc}</p><p class="fit">${idea.fit}</p></div>`;
+  grid.append(card);
+  const canvas = card.querySelector('canvas');
+  return { canvas, g: canvas.getContext('2d'), back: makeBackdrop(), draw: idea.make() };
+});
+
+const auto = document.getElementById('auto'), amount = document.getElementById('amount'), mood = document.getElementById('mood'), bar = document.getElementById('bar');
+amount.oninput = () => { auto.checked = false; };
+let last = performance.now(), t = 0, s = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+  // Auto: quiet 3 s, swell over 5 s, hold 5 s, fade over 4 s.
+  let target = +amount.value;
+  if (auto.checked) { const c = t % 17; target = c < 3 ? 0.05 : c < 8 ? 0.05 + 0.9 * (c - 3) / 5 : c < 13 ? 0.95 : 0.95 - 0.9 * (c - 13) / 4; amount.value = target.toFixed(2); }
+  s += (target - s) * (1 - Math.exp(-dt * 3));
+  bar.style.width = `${s * 100}%`;
+  const m = +mood.value;
+  for (const sc of scenes) {
+    const dpr = Math.min(2, devicePixelRatio || 1), w = sc.canvas.clientWidth * dpr, h = sc.canvas.clientHeight * dpr;
+    if (sc.canvas.width !== w || sc.canvas.height !== h) { sc.canvas.width = w; sc.canvas.height = h; }
+    sc.back(sc.g, w, h, t, dt, moodHue(m));
+    sc.g.globalCompositeOperation = 'lighter';
+    sc.draw(sc.g, w, h, t, dt, s, m);
+    sc.g.globalCompositeOperation = 'source-over';
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

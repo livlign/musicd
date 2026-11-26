@@ -1,4 +1,5 @@
-// musicd: open the page, allow audio, watch. No interface on screen.
+// musicd: open the page, allow audio, watch. The only interface is the logo in
+// the corner, which opens a small panel with info and settings.
 //
 // - On load it asks to hear this computer's sound (the speaker output where the
 //   system offers it, otherwise the microphone) and follows it live.
@@ -13,10 +14,15 @@ import type { SongAnalysis } from './analysis/types';
 import { Player } from './audio/player';
 import type { Frame } from './feed/frame';
 import { idleFrame } from './feed/frame';
+import { BeatTracker } from './feed/beat';
 import { applyPresence } from './feed/gate';
 import { LiveFeed, NoSpeakerMonitorError, captureSpeakers } from './feed/live';
 import { SpectrumTap } from './feed/spectrum';
 import { TimelineFeed } from './feed/timeline';
+import { Menu } from './ui/menu';
+import { PartsView } from './ui/parts';
+import { Recorder } from './ui/recorder';
+import { SyncView } from './ui/sync';
 import { Cosmos } from './viz/cosmos';
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
@@ -25,6 +31,8 @@ const player = new Player();
 const playerTap = new SpectrumTap(player.ctx, player.output);
 const ears = new Ears(player.ctx, new URL('vendor/', document.baseURI).href);
 const scene = new Cosmos();
+const beats = new BeatTracker();
+let frameTime = 1 / 60;
 
 let mode: 'idle' | 'live' | 'file' = 'idle';
 let live: LiveFeed | null = null;
@@ -33,6 +41,32 @@ let timelineMode: SongAnalysis['mode'] = 'quick';
 let cancelDeep: (() => void) | null = null;
 let loadId = 0;
 let listening = false;
+let sourceLabel = '';
+let fileName = '';
+
+const menu = new Menu();
+const parts = new PartsView();
+const sync = new SyncView();
+document.body.append(parts.el, sync.el);
+const recorder = new Recorder(player.ctx);
+menu.onRecord = async () => {
+  if (recorder.recording) {
+    const names = await recorder.stop();
+    menu.setRecording(null, `Saved ${names.join(' and ')} to your downloads.`);
+    return;
+  }
+  const source = mode === 'live' && live ? live.source : mode === 'file' ? player.output : null;
+  if (!source) {
+    menu.setRecording(null, 'musicd is not hearing anything yet. Allow listening (click anywhere), then try again.');
+    return;
+  }
+  await recorder.start(source, { version: __APP_VERSION__, mode, source: mode === 'live' ? sourceLabel : fileName });
+  menu.setRecording(0, 'Recording. Stop when the song ends (here, or with the REC button under the logo).');
+};
+menu.onChange = (s) => {
+  parts.show(s.debug);
+  sync.show(s.debug);
+};
 
 // Exposed for automated testing in development builds only.
 const debug: Record<string, unknown> = { ears, scene };
@@ -56,10 +90,11 @@ async function listen() {
   try {
     let streams: MediaStream[];
     try {
-      ({ streams } = await captureSpeakers());
+      ({ streams, label: sourceLabel } = await captureSpeakers());
     } catch (err) {
       if (!(err instanceof NoSpeakerMonitorError)) throw err;
       // No speaker-output input offered: hear the room through the microphone.
+      sourceLabel = 'the microphone';
       streams = [
         await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
@@ -103,6 +138,7 @@ void listen();
 // --- a dropped song ---------------------------------------------------------------------
 async function playFile(blob: Blob) {
   const id = ++loadId;
+  fileName = blob instanceof File ? blob.name : 'a song';
   void player.ctx.resume();
   cancelDeep?.();
   stopLive();
@@ -153,6 +189,15 @@ window.addEventListener('drop', (e) => {
   if (f) void playFile(f);
 });
 window.addEventListener('keydown', (e) => {
+  const typing = e.target instanceof HTMLInputElement;
+  if (e.code === 'Escape' && menu.isOpen) {
+    menu.toggle(false);
+    return;
+  }
+  if (e.code === 'KeyD' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    menu.set({ debug: !menu.settings.debug });
+    return;
+  }
   if (e.code === 'Space' && mode === 'file') {
     e.preventDefault();
     if (player.playing) player.pause();
@@ -172,6 +217,16 @@ window.addEventListener('pointermove', () => {
   stillTimer = window.setTimeout(() => document.body.classList.add('still'), 1800);
 });
 document.body.classList.add('still');
+
+// --- what musicd is doing, in words (menu panel and debug view) ----------------------------
+function statusText(): string {
+  if (mode === 'live') return `Listening to ${sourceLabel.charAt(0).toLowerCase()}${sourceLabel.slice(1)}.`;
+  if (mode === 'file') {
+    const what = timelineMode === 'deep' ? 'with full separation' : 'separating its parts…';
+    return `${player.playing ? 'Playing' : 'Paused'}: ${fileName}, ${what}`;
+  }
+  return listening ? 'Waiting for permission to listen…' : 'Not listening yet. Click anywhere to allow it.';
+}
 
 // --- render loop --------------------------------------------------------------------------
 let last = performance.now();
@@ -198,7 +253,38 @@ function loop(now: number) {
     frame = idleFrame(clock, dt);
   }
   if (!frame.idle) applyPresence(frame, ears, mode === 'file' && timelineMode === 'deep');
+  // Beats are fired early by the delay between a sound being played and its
+  // frame being on screen: the capture delay, and about a frame and a half of drawing.
+  frameTime += (dt - frameTime) * 0.05;
+  const captureDelay = mode === 'live' && live ? live.captureDelay() : null;
+  const lead = (mode === 'live' ? (captureDelay ?? 0.02) : 0) + frameTime * 1.5;
+  const beat = beats.update(frame, now / 1000, lead, mode === 'live');
+  const bs = beats.state;
+  if (beat) frame.beat = beat;
+  frame.beatLocked = bs.locked;
+  if (bs.locked) frame.bpm = 60 / bs.period;
   scene.draw(ctx, frame);
+  menu.mark.update({
+    dt,
+    audible: frame.idle ? 0 : (frame.audible ?? 0),
+    level: Math.max(frame.level.drums, frame.level.bass, frame.level.vocals, frame.level.other),
+    beat: frame.hits.some((h) => (h.hit === 'kick' || h.hit === 'snare') && h.v > 0.3),
+  });
+  if (menu.isOpen || menu.settings.debug) {
+    const status = statusText();
+    menu.setStatus(status);
+    parts.setStatus(status);
+  }
+  parts.update(frame);
+  sync.update(frame, now / 1000, captureDelay);
+  if (recorder.recording) {
+    recorder.log(frame, {
+      scene: scene.debugState(),
+      live: mode === 'live' && live ? { ...live.debugIntensity, ...live.debugDrums, voiceConf: live.debugVoice.conf, voiceP: live.debugVoice.p } : undefined,
+      captureDelay,
+    });
+    menu.setRecording(recorder.elapsed);
+  }
   counts.hits += frame.hits.length;
   counts.notes += frame.notes.length;
   for (const h of frame.hits) counts[h.hit] = (counts[h.hit] ?? 0) + 1;

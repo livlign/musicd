@@ -5,6 +5,7 @@
 import type { Voice } from '../analysis/types';
 import type { Frame, HitEvent, NoteEvent } from './frame';
 import { emptyLevels } from './frame';
+import { DETECT_DELAY } from './beat';
 import { SpectrumTap } from './spectrum';
 
 // Calibrated on test clips: percussive share of the sound was ~0.19 for solo
@@ -79,11 +80,13 @@ export class LiveFeed {
   private lastVocal = { p: 0, t: -1 };
   // Signal-based drum evidence (the classifier often misses drums in a dense mix).
   private drumOnsets: number[] = [];
+  /** Hi-hat and cymbal onsets: a drum kit almost always keeps time on them. */
+  private hatTimes: number[] = [];
   private percShare = 0;
   private drumEvidence = 0;
   private evidenceAt = 0;
   /** Raw drum-evidence features, exposed for calibration/testing. */
-  debugDrums = { reg: 0, rate: 0, share: 0 };
+  debugDrums = { reg: 0, rate: 0, share: 0, hats: 0 };
   // Continuous vocal pitch.
   private f0Hist: number[] = [];
   private voiceHeld: { p: number; t: number } | null = null;
@@ -256,6 +259,7 @@ export class LiveFeed {
       const crash = this.hatLevel > 0 && highE > this.hatLevel * 3.5;
       this.hatLevel = this.hatLevel ? this.hatLevel * 0.85 + highE * 0.15 : highE;
       hits.push({ hit: crash ? 'cymbal' : 'hat', v: high });
+      this.hatTimes.push(t);
       this.drumOnsets.push(t);
     }
     this.updateDrumEvidence(t, step);
@@ -348,7 +352,8 @@ export class LiveFeed {
     // piano 0.19, a ballad verse 0.17, a drummed chorus 0.30).
     const punch = c01((this.percShare - 0.19) / 0.1);
     const intense = audible * c01(0.55 * punch + 0.15 * loud + 0.15 * dens + 0.15 * Math.max(bright, c01(fullness * 1.6) * 0.5));
-    this.intensity += (intense - this.intensity) * (1 - Math.exp(-step / (intense > this.intensity ? 2 : 4)));
+    // Rise fast (music starting should show at once), fall slowly.
+    this.intensity += (intense - this.intensity) * (1 - Math.exp(-step / (intense > this.intensity ? 0.5 : 4)));
     this.debugIntensity = { tonal: this.debugIntensity.tonal, swell: this.debugIntensity.swell, grit: this.debugIntensity.grit, punch: +punch.toFixed(2), loud: +loud.toFixed(2), dens: +dens.toFixed(2), full: +fullness.toFixed(2), bright: +bright.toFixed(2), i: +this.intensity.toFixed(2) };
 
     // Grit: how noise-like the 1–5 kHz range is. Distorted guitars are rough
@@ -394,7 +399,9 @@ export class LiveFeed {
     } else this.fourFloor *= Math.exp(-step / 6);
 
     const quiet = audible < 0.35;
+    const strongest = hits.reduce<HitEvent | null>((a, h) => (h.hit !== 'hat' && (!a || h.v > a.v) ? h : a), null);
     return {
+      hitAge: strongest && !quiet ? (DETECT_DELAY[strongest.hit] ?? 0.06) : undefined,
       t,
       dt,
       hits: quiet ? [] : hits,
@@ -414,6 +421,21 @@ export class LiveFeed {
     };
   }
 
+  /** The browser's own measure of the delay from the system to this page, in seconds (Chrome only). */
+  captureDelay(): number | null {
+    let sum = 0;
+    let count = 0;
+    for (const s of this.streams)
+      for (const t of s.getAudioTracks()) {
+        const st = (t as MediaStreamTrack & { stats?: { latency?: number } }).stats;
+        if (st && typeof st.latency === 'number') {
+          sum += st.latency / 1000;
+          count++;
+        }
+      }
+    return count ? sum / count : null;
+  }
+
   /**
    * Drums leave a steady, regular pattern of short broadband attacks. Measure
    * how much of the sound is percussive, how often attacks come, and how
@@ -426,6 +448,7 @@ export class LiveFeed {
     const share = P / (P + Hh + 1e-20);
     this.percShare += (share - this.percShare) * (1 - Math.exp(-dt / 3));
     while (this.drumOnsets.length && this.drumOnsets[0] < t - 6) this.drumOnsets.shift();
+    while (this.hatTimes.length && this.hatTimes[0] < t - 6) this.hatTimes.shift();
     if (t - this.evidenceAt < 0.5) return;
     this.evidenceAt = t;
     const ts = this.drumOnsets;
@@ -447,9 +470,15 @@ export class LiveFeed {
         reg = Math.max(reg, hit / ts.length);
       }
     }
-    this.debugDrums = { reg: +reg.toFixed(2), rate: +rate.toFixed(2), share: +this.percShare.toFixed(3) };
+    this.debugDrums = { reg: +reg.toFixed(2), rate: +rate.toFixed(2), share: +this.percShare.toFixed(3), hats: +(this.hatTimes.length / 6).toFixed(2) };
     const c = (x: number) => Math.max(0, Math.min(1, x));
-    const target = c((reg - 0.45) / 0.2) * c((rate - 1.5) / 2) * c((this.percShare - DRUM_SHARE_LO) / DRUM_SHARE_SPAN);
+    // Either enough of the sound is percussive, or (in a mix where loud guitars
+    // drown the drums' share) a steady stream of hi-hats keeps time. Solo piano
+    // has neither: its percussive share is low and it makes almost no hi-hat-band onsets.
+    const hatRate = this.hatTimes.length / 6;
+    const byShare = c((this.percShare - DRUM_SHARE_LO) / DRUM_SHARE_SPAN);
+    const byHats = c((hatRate - 1.2) / 1.2) * c((this.percShare - 0.11) / 0.05);
+    const target = c((reg - 0.45) / 0.2) * c((rate - 1.5) / 2) * Math.max(byShare, byHats);
     this.drumEvidence += (target - this.drumEvidence) * (target > this.drumEvidence ? 0.5 : 0.15);
   }
 
@@ -495,7 +524,8 @@ export class LiveFeed {
     let sum = 0;
     let count = 0;
     const sal = new Map<number, number>();
-    for (let m = 45; m <= 84; m += 0.25) {
+    // From G2 (98 Hz, a low male voice) to C6.
+    for (let m = 43; m <= 84; m += 0.25) {
       const f0 = 440 * Math.pow(2, (m - 69) / 12);
       let s = 0;
       for (let h = 1; h <= 6; h++) s += Math.pow(0.85, h - 1) * mag(f0 * h);

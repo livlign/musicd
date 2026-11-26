@@ -40,6 +40,11 @@ export interface Frame {
   layout?: 'center' | 'stage' | 'pitch';
   /** Live only: the sung pitch right now (MIDI, fractional), or null. */
   voice?: { p: number; level: number } | null;
+  /**
+   * Live only: the main melody line when it is not recognised as a voice (a
+   * flute, a đàn bầu, a lead guitar, or a singer the recogniser missed).
+   */
+  melody?: { p: number; level: number } | null;
   /** Live only: 0..1 evidence of a drum kit from the sound itself. */
   drumEvidence?: number;
   /** 0 = silence … 1 = clearly audible, in absolute terms. */
@@ -54,6 +59,14 @@ export interface Frame {
   swell?: number;
   /** Live: 0..1 evidence of a four-on-the-floor dance beat (electronic music). */
   fourFloor?: number;
+  /** Live: how long after the real sound this frame's strongest kick or snare was detected (seconds, measured per kind). */
+  hitAge?: number;
+  /** A beat lands in this frame (strength 0..1), from the beat tracker; timed to be seen as it is heard. */
+  beat?: number;
+  /** The beat tracker is following a steady beat (then pulses come from `beat`, not from raw hits). */
+  beatLocked?: boolean;
+  /** Tempo the beat tracker follows (bpm), when locked. */
+  bpm?: number;
 }
 
 export const emptyLevels = (): Record<PartId, number> => ({ drums: 0, bass: 0, vocals: 0, other: 0 });

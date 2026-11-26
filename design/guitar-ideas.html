@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>musicd · ideas for the guitar</title>
+<style>
+  :root { --bg: #030308; --panel: #0a0b14; --line: #1a1c2c; --text: #e6e9f5; --muted: #8b90aa; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { max-width: 1240px; margin: 0 auto; padding: 40px 28px 22px; display: grid; gap: 16px; }
+  h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; font-weight: 650; }
+  h1 span { color: var(--muted); font-weight: 400; }
+  header p { margin: 0; color: var(--muted); max-width: 780px; text-wrap: pretty; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 13px; }
+  .controls label { display: inline-flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+  .controls input[type=range] { width: 130px; accent-color: #8a7cff; }
+  .controls select { background: #10121e; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font: inherit; }
+  main { max-width: 1240px; margin: 0 auto; padding: 0 28px 40px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.ref { opacity: 0.85; }
+  canvas { display: block; width: 100%; aspect-ratio: 16 / 10; background: #020208; }
+  .info { padding: 14px 18px 18px; }
+  .head { display: flex; gap: 10px; align-items: baseline; }
+  .letter { font-weight: 700; font-size: 12px; color: var(--bg); background: #cfd6ff; border-radius: 6px; padding: 0 7px; }
+  .ref .letter { background: #555b78; color: var(--text); }
+  h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+  .info p { margin: 6px 0 0; color: var(--muted); font-size: 14px; text-wrap: pretty; }
+  .fit { margin-top: 8px !important; font-size: 13px !important; color: #b6bdd8 !important; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>The guitar <span>· ideas</span></h1>
+    <p>Guitars are strummed chords (a quick sweep across six strings, down or up) and single-note lines.
+      The visual should feel plucked and strummed, ring for as long as the chord does, read clearly next to the
+      dust, and look different from the piano's stars. Each panel is a small Cosmos driven by the same playing:
+      a strummed rhythm, with a short lead line every other bar. The last panel is today's version.</p>
+  </div>
+  <div class="controls">
+    <label>Playing <select id="style">
+      <option value="strum">strummed chords + lead line</option>
+      <option value="lead">lead line only</option>
+      <option value="slow">slow ringing chords</option>
+    </select></label>
+    <label>Tempo <input type="range" id="bpm" min="70" max="160" step="1" value="104"> <b id="bpmv">104</b> bpm</label>
+  </div>
+</header>
+<main id="grid"></main>
+
+<script>
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const TAU = Math.PI * 2;
+let seed = 21; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const puffCache = new Map();
+function puff(hue, sat = 70, light = 60) {
+  const key = `${Math.round(hue / 6) * 6}|${sat}|${light}`;
+  let c = puffCache.get(key);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    for (let i = 0; i <= 6; i++) { const u = i / 6; gr.addColorStop(u, `hsla(${hue} ${sat}% ${light}% / ${(0.5 * Math.exp(-u * u * 4.5)).toFixed(3)})`); }
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); puffCache.set(key, c);
+  }
+  return c;
+}
+const MOOD = 262, WARM = 28; // violet mood; guitars in the scene's warm accent
+
+function makeWorld() {
+  const stars = Array.from({ length: 160 }, () => ({ x: rnd(), y: rnd(), b: Math.pow(rnd(), 2.4), tw: rnd() * 6 }));
+  const dust = Array.from({ length: 110 }, () => ({ a: rnd() * TAU, r: 0.2 + rnd() * 2.6, z: 2 + rnd() * 30, h: rnd() }));
+  return (g, w, h, t, dt) => {
+    g.globalCompositeOperation = 'source-over'; g.fillStyle = '#020208'; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'lighter';
+    for (const s of stars) { g.fillStyle = `hsla(215 25% 92% / ${(0.15 + s.b * 0.42) * (0.75 + 0.25 * Math.sin(t * 0.8 + s.tw))})`; g.fillRect(s.x * w, s.y * h, 1 + s.b, 1 + s.b); }
+    const F = Math.min(w, h) * 0.85, cx = w / 2, cy = h / 2;
+    const core = Math.min(w, h) * 0.05; g.globalAlpha = 0.5; g.drawImage(puff(30, 80, 62), cx - core * 2, cy - core * 2, core * 4, core * 4); g.globalAlpha = 1;
+    for (const d of dust) {
+      d.z -= dt * 3; if (d.z < 0.6) { d.z = 30; d.a = rnd() * TAU; d.r = 0.2 + rnd() * 2.6; }
+      const s = F / d.z, x = cx + Math.cos(d.a) * d.r * s, y = cy + Math.sin(d.a) * d.r * s;
+      const a = clamp((30 - d.z) / 8) * clamp((d.z - 0.6) / 5) * 0.4, R = clamp(0.012 * s, 0.6, 5);
+      g.globalAlpha = a; g.drawImage(puff((MOOD + 40 + d.h * 70) % 360, 85, 68), x - R * 2, y - R * 2, R * 4, R * 4);
+    }
+    g.globalAlpha = 1;
+  };
+}
+
+/* ───────── A · Strings of light ───────── */
+function strings() {
+  // Six fine strings across the lower sky, fanning out from the vanishing point like a guitar neck in perspective.
+  const S = Array.from({ length: 6 }, (_, i) => ({ amp: 0, ph: 0, lit: 0, freq: 9 - i * 1.1 }));
+  const queue = [];
+  return {
+    strum(v, down, t) { for (let k = 0; k < 6; k++) queue.push({ at: t + k * 0.012, i: down ? k : 5 - k, v }); },
+    pluck(p, v, t) { queue.push({ at: t, i: clamp(Math.round((p - 60) / 4), 0, 5), v: v * 1.3 }); },
+    draw(g, w, h, t, dt) {
+      for (let q = queue.length - 1; q >= 0; q--) if (queue[q].at <= t) { const s = S[queue[q].i]; s.amp = Math.max(s.amp, queue[q].v); s.lit = Math.max(s.lit, queue[q].v); queue.splice(q, 1); }
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2;
+      for (let i = 0; i < 6; i++) {
+        const s = S[i]; s.amp *= Math.exp(-dt * 2.2); s.lit *= Math.exp(-dt * 3); s.ph += dt * s.freq * 6;
+        const ang = 0.35 + i * 0.09; // fanning below the centre, to the right
+        const x0 = cx + Math.cos(ang) * M * 0.12, y0 = cy + Math.sin(ang) * M * 0.12;
+        const x1 = cx + Math.cos(ang) * M * 1.0, y1 = cy + Math.sin(ang) * M * 1.0;
+        const nx = -(y1 - y0), ny = x1 - x0, nl = Math.hypot(nx, ny);
+        g.strokeStyle = `hsla(${WARM + i * 4} 70% ${70 + 20 * s.lit}% / ${0.06 + 0.7 * clamp(s.lit)})`;
+        g.lineWidth = 0.8 + 1.2 * clamp(s.lit);
+        g.beginPath();
+        for (let k = 0; k <= 40; k++) {
+          const u = k / 40, wob = Math.sin(Math.PI * u) * Math.sin(s.ph) * s.amp * M * 0.012 * (0.5 + u);
+          const x = x0 + (x1 - x0) * u + (nx / nl) * wob, y = y0 + (y1 - y0) * u + (ny / nl) * wob;
+          k ? g.lineTo(x, y) : g.moveTo(x, y);
+        }
+        g.stroke();
+      }
+    },
+  };
+}
+
+/* ───────── B · Spark sweep ───────── */
+function sparks() {
+  const P = [];
+  return {
+    strum(v, down, t) {
+      const base = rnd() * TAU, n = Math.round(14 + 14 * v);
+      for (let k = 0; k < n; k++) { const u = k / (n - 1); P.push({ ang: base + (down ? u : 1 - u) * 0.9, r: 0.3 + rnd() * 0.06, delay: u * 0.06, life: 0, max: 0.8 + rnd() * 0.5, v }); }
+    },
+    pluck(p, v) { const ang = rnd() * TAU; for (let k = 0; k < 6; k++) P.push({ ang: ang + (rnd() - 0.5) * 0.15, r: 0.25 + (p - 60) / 120, delay: 0, life: 0, max: 1.2, v }); },
+    draw(g, w, h, t, dt) {
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2;
+      for (let i = P.length - 1; i >= 0; i--) {
+        const q = P[i]; q.life += dt; const k = (q.life - q.delay) / q.max;
+        if (k >= 1) { P.splice(i, 1); continue; } if (k < 0) continue;
+        const r = (q.r + k * 0.25) * M, x = cx + Math.cos(q.ang) * r * 1.2, y = cy + Math.sin(q.ang) * r;
+        const a = (1 - k) * (0.6 + 0.4 * q.v), R = 2.5 + 3 * (1 - k);
+        g.globalAlpha = a * 0.6; g.drawImage(puff(WARM, 85, 66), x - R * 2.5, y - R * 2.5, R * 5, R * 5);
+        g.globalAlpha = 1; g.fillStyle = `hsla(${WARM + 10} 90% 85% / ${a})`; g.beginPath(); g.arc(x, y, 1.2, 0, TAU); g.fill();
+      }
+    },
+  };
+}
+
+/* ───────── C · Pick stroke ───────── */
+function stroke() {
+  const arcs = [];
+  return {
+    strum(v, down) { arcs.push({ a0: rnd() * TAU, span: 0.7 + 0.5 * v, r: 0.3 + rnd() * 0.12, dir: down ? 1 : -1, life: 0, max: 0.9, v, w: 1 }); },
+    pluck(p, v) { arcs.push({ a0: rnd() * TAU, span: 0.25, r: 0.2 + (p - 60) / 100, dir: 1, life: 0, max: 1.1, v, w: 0.6 }); },
+    draw(g, w, h, t, dt) {
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2;
+      for (let i = arcs.length - 1; i >= 0; i--) {
+        const s = arcs[i]; s.life += dt; const k = s.life / s.max;
+        if (k >= 1) { arcs.splice(i, 1); continue; }
+        // A crescent of light swept across the view like a pick stroke: drawn fast, then it glows and fades.
+        const drawn = clamp(s.life / 0.08), R = s.r * M * (1 + k * 0.15);
+        const from = s.a0, to = s.a0 + s.dir * s.span * drawn;
+        const a = (1 - k) * (0.5 + 0.5 * s.v);
+        for (const [lw, f] of [[M * 0.03 * s.w, 0.12], [M * 0.008 * s.w, 0.45], [1.2, 0.95]]) {
+          g.strokeStyle = `hsla(${WARM + 8} 85% ${lw === 1.2 ? 88 : 66}% / ${a * f})`; g.lineWidth = lw; g.lineCap = 'round';
+          g.beginPath(); g.ellipse(cx, cy, R * 1.2, R, 0, Math.min(from, to), Math.max(from, to)); g.stroke();
+        }
+      }
+    },
+  };
+}
+
+/* ───────── today · strum sparks ───────── */
+function today() {
+  const P = [];
+  return {
+    strum(v) { const base = rnd() * TAU, n = Math.round(10 * (0.6 + v)); for (let k = 0; k < n; k++) P.push({ ang: base + (k / (n - 1) - 0.5) * 0.9, r: 0.3 + rnd() * 0.1, life: 0 }); },
+    pluck(p, v) { const base = rnd() * TAU; for (let k = 0; k < 4; k++) P.push({ ang: base + (k / 3 - 0.5) * 0.9, r: 0.3, life: 0 }); },
+    draw(g, w, h, t, dt) {
+      const M = Math.min(w, h), cx = w / 2, cy = h / 2;
+      for (let i = P.length - 1; i >= 0; i--) {
+        const q = P[i]; q.life += dt; if (q.life > 1.2) { P.splice(i, 1); continue; }
+        const r = (q.r + q.life * 0.5) * M, x = cx + Math.cos(q.ang) * r, y = cy + Math.sin(q.ang) * r, R = 1.5 + q.life * 3;
+        g.globalAlpha = (1 - q.life / 1.2) * 0.3; g.drawImage(puff(WARM, 85, 66), x - R * 2, y - R * 2, R * 4, R * 4); g.globalAlpha = 1;
+      }
+    },
+  };
+}
+
+const IDEAS = [
+  { key: 'A', name: 'Strings of light', make: strings, desc: 'Six fine strings of warm light fan out from the vanishing point, like a guitar neck seen in perspective. A strum sweeps across them in quick succession, down or up, and each one vibrates and glows while the chord rings. A lead note plucks a single string, chosen by pitch.', fit: 'Fits: unmistakably a guitar, and the vibration shows how long the chord rings. Risk: the strings stay in place, a fixed element in the sky.' },
+  { key: 'B', name: 'Spark sweep', make: sparks, desc: 'Today’s idea done properly: each strum throws a bright, crisp fan of warm sparks across an arc, in the direction of the stroke; a lead note sends a small cluster. Brighter and crisper than the dust, so it reads.', fit: 'Fits: energetic, scattered all over the sky, nothing fixed. Risk: still particles, closer to the dust than A or C.' },
+  { key: 'C', name: 'Pick stroke', make: stroke, desc: 'Each strum is a crescent of light swept across the view like a pick stroke, drawn in a flash, then glowing and fading; down and up strokes sweep opposite ways. A lead note is a short, small arc.', fit: 'Fits: shows the gesture of strumming itself, and is easy to read. Risk: big arcs on every strum could be a lot in fast rhythm guitar.' },
+  { key: '·', name: 'Today: strum sparks', make: today, ref: true, desc: 'The current guitar: a faint sweep of sparks that join the dust.', fit: 'For comparison: it looks like more dust, so it barely reads as a guitar.' },
+];
+
+const grid = document.getElementById('grid');
+const panels = IDEAS.map((idea) => {
+  const card = document.createElement('article');
+  card.className = 'card' + (idea.ref ? ' ref' : '');
+  card.innerHTML = `<canvas></canvas><div class="info"><div class="head"><span class="letter">${idea.key}</span><h2>${idea.name}</h2></div><p>${idea.desc}</p><p class="fit">${idea.fit}</p></div>`;
+  grid.append(card);
+  const canvas = card.querySelector('canvas');
+  return { canvas, g: canvas.getContext('2d'), back: makeWorld(), fx: idea.make() };
+});
+
+const styleEl = document.getElementById('style'), bpmEl = document.getElementById('bpm');
+bpmEl.oninput = () => { document.getElementById('bpmv').textContent = bpmEl.value; };
+// Strum rhythm per bar in eighths: D . D U . U D U (1 = down, -1 = up, 0 = rest)
+const RHYTHM = [1, 0, 1, -1, 0, -1, 1, -1];
+const LEAD = [64, 67, 69, 71, 72, 71, 69, 67];
+let last = performance.now(), t = 0, next = 0, step = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+  const eighth = 30 / +bpmEl.value, style = styleEl.value;
+  if (next < t - 0.5) next = t;
+  while (t >= next) {
+    const bar = Math.floor(step / 8), i = step % 8;
+    if (style === 'slow') { if (i === 0 || i === 4) for (const p of panels) p.fx.strum(0.8, true, t); }
+    else {
+      if (style === 'strum' && RHYTHM[i]) for (const p of panels) p.fx.strum(RHYTHM[i] > 0 ? 0.85 : 0.55, RHYTHM[i] > 0, t);
+      if ((style === 'lead' || bar % 2 === 1) && i % 2 === 0) for (const p of panels) p.fx.pluck(LEAD[(step / 2) % 8 | 0], 0.7, t);
+    }
+    step++; next += eighth;
+  }
+  for (const p of panels) {
+    const dpr = Math.min(2, devicePixelRatio || 1), w = p.canvas.clientWidth * dpr, h = p.canvas.clientHeight * dpr;
+    if (p.canvas.width !== w || p.canvas.height !== h) { p.canvas.width = w; p.canvas.height = h; }
+    p.back(p.g, w, h, t, dt);
+    p.g.globalCompositeOperation = 'lighter';
+    p.fx.draw(p.g, w, h, t, dt);
+    p.g.globalCompositeOperation = 'source-over';
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

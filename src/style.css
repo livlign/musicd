@@ -21,3 +21,339 @@ body.still,
 body.still #stage {
   cursor: none;
 }
+
+/* --- brand: logo and name in the top-left corner, opens the panel ------------------------ */
+@font-face {
+  font-family: 'Unbounded';
+  src: url('/fonts/unbounded-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+:root {
+  --cyan: #8fe8ff;
+  --indigo: #6a5cf0;
+  --text: #e6e9f5;
+  --muted: #8d93ad;
+  --glass: rgba(10, 11, 22, 0.78);
+  --hair: rgba(150, 170, 255, 0.14);
+  --brand-font: 'Unbounded', ui-rounded, system-ui, sans-serif;
+  --ui-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.brand {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(14px, env(safe-area-inset-left));
+  z-index: 10;
+  color: var(--text);
+  font: 14px/1.5 var(--ui-font);
+  transition: opacity 0.8s;
+}
+/* While you just watch, the logo steps back. */
+body.still .brand:not(.open) {
+  opacity: 0.7;
+}
+
+.brand-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s;
+}
+.brand-button:hover,
+.brand.open .brand-button {
+  background: var(--glass);
+  border-color: var(--hair);
+  backdrop-filter: blur(12px);
+}
+.brand-button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.wordmark {
+  font: 500 19px/1 var(--brand-font);
+  letter-spacing: -0.04em;
+  padding-bottom: 1px;
+}
+
+.panel {
+  margin-top: 8px;
+  width: min(360px, calc(100vw - 28px));
+  max-height: calc(100vh - 90px);
+  overflow: auto;
+  padding: 18px 20px 16px;
+  border: 1px solid var(--hair);
+  border-radius: 18px;
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: panel-in 0.22s ease-out;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.panel p {
+  margin: 0;
+}
+.panel-lede {
+  font-size: 15px;
+  text-wrap: pretty;
+}
+.panel-status {
+  margin-top: 8px !important;
+  color: var(--cyan);
+  font-size: 13px;
+}
+.panel section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hair);
+}
+.panel h2 {
+  margin: 0 0 10px;
+  font: 500 11px/1 var(--brand-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.setting {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.setting b {
+  font-weight: 600;
+  display: block;
+}
+.setting small {
+  color: var(--muted);
+  font-size: 12.5px;
+  display: block;
+  text-wrap: pretty;
+}
+.setting input {
+  appearance: none;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  border-radius: 99px;
+  background: #262a40;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.setting input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #c9cde0;
+  transition: transform 0.2s, background 0.2s;
+}
+.setting input:checked {
+  background: linear-gradient(90deg, var(--cyan), var(--indigo));
+}
+.setting input:checked::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+.setting input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.keys {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+.keys dt {
+  color: var(--text);
+}
+.keys dd {
+  margin: 0;
+  color: var(--muted);
+}
+kbd {
+  font: 12px var(--ui-font);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 0 5px;
+}
+.panel-foot {
+  margin-top: 16px !important;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* --- debug: the parts musicd recognises, each line as long as the part has played -------- */
+.parts {
+  position: fixed;
+  left: max(20px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 5;
+  pointer-events: none;
+  font: 12px/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--text);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+.parts-status {
+  color: var(--muted);
+  margin-bottom: 10px;
+  font-family: var(--ui-font);
+}
+.parts-list {
+  display: grid;
+  gap: 7px;
+}
+.part {
+  display: grid;
+  grid-template-columns: 64px auto auto;
+  align-items: center;
+  justify-content: start;
+  gap: 10px;
+  --c: hsl(var(--hue) 80% 72%);
+  animation: part-in 0.3s ease-out;
+}
+@keyframes part-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+.part-label {
+  color: var(--c);
+}
+.part-track {
+  display: block;
+  max-width: min(46vw, 440px);
+  overflow: hidden;
+}
+.part-bar {
+  display: block;
+  height: 6px;
+  position: relative;
+  /* one dot every half second */
+  background: radial-gradient(circle, var(--c) 1.3px, transparent 1.6px) 0 50% / 5px 6px repeat-x;
+}
+/* The head of the line flashes when the part sounds. */
+.part-bar::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--c);
+  opacity: calc(0.35 + var(--flash, 0) * 0.65);
+  box-shadow: 0 0 calc(4px + var(--flash, 0) * 10px) var(--c);
+}
+.part.ended .part-bar::after {
+  display: none;
+}
+.part.ended {
+  --c: hsl(var(--hue) 25% 55%);
+}
+.part-time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* --- debug: sync strip (bottom right) and the delay check in the panel ------------------- */
+.sync {
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 5;
+  pointer-events: none;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.sync canvas {
+  border-radius: 8px;
+  border: 1px solid var(--hair);
+}
+.sync-readout {
+  max-width: 360px;
+  white-space: pre-line;
+  text-align: right;
+  font: 12px/1.45 var(--ui-font);
+  color: var(--muted);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+.debug-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sync[hidden],
+.debug-note[hidden] {
+  display: none;
+}
+
+/* --- debug: recording -------------------------------------------------------------------- */
+.debug-note button {
+  font: 13px var(--ui-font);
+  color: var(--text);
+  background: rgba(143, 232, 255, 0.08);
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.debug-note button:hover {
+  border-color: var(--cyan);
+}
+.debug-note button.on {
+  border-color: #ff6b7a;
+  color: #ffd0d5;
+}
+.debug-note p + p,
+.record-help {
+  margin-top: 8px !important;
+}
+.record-help {
+  display: block;
+  font-size: 12px;
+}
+.rec {
+  display: block;
+  margin: 6px 0 0 6px;
+  font: 600 12px var(--ui-font);
+  color: #ffd0d5;
+  background: rgba(120, 20, 35, 0.55);
+  border: 1px solid rgba(255, 107, 122, 0.5);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  animation: rec-pulse 2s ease-in-out infinite;
+}
+.rec[hidden] {
+  display: none;
+}
+@keyframes rec-pulse {
+  50% {
+    border-color: rgba(255, 107, 122, 0.15);
+  }
+}
