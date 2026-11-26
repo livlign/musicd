@@ -28,6 +28,8 @@ interface Mote {
   sx: number; // last screen position (for streaks)
   sy: number;
   seen: boolean;
+  /** Seconds since the mote was born from a sound (undefined: background dust). */
+  age?: number;
 }
 
 interface Ring {
@@ -93,7 +95,18 @@ export class Cosmos {
   private bass = 0;
   private bassHit = 0;
   private kickFlash = 0;
-  private comet = { x: 0, y: 0, p: 60, target: 60, lo: 127, hi: 0, lv: 0, lastAt: -9 };
+  /** A short pulse on every kick and snare: the whole field brightens for a moment. */
+  private beatFlash = 0;
+  /** The melody line: a comet. `voice` 1 = a singing voice (warm), 0 = an instrument (cool). */
+  private comet = { x: 0, y: 0, p: 60, target: 60, lo: 127, hi: 0, lv: 0, lastAt: -9, voice: 1 };
+  /**
+   * Notes of keys and other note instruments (piano, đàn tranh, harp…): each
+   * lights a star around the centre, placed by its note name (angle) and how
+   * high it is (distance). Chords make small constellations; melody notes are
+   * linked by faint lines.
+   */
+  private noteStars: { x: number; y: number; v: number; age: number; life: number; hue: number; from?: [number, number] }[] = [];
+  private lastLead: { x: number; y: number; t: number } | null = null;
   private spawnDebt = new Float32Array(SPECTRUM_BANDS);
   /** 0 = chill … 1 = intense: drives colour, saturation and brightness. */
   private intensity = 0.25;
@@ -111,7 +124,18 @@ export class Cosmos {
   private swell = 0;
   /** How clearly bowed strings / string sections are recognised (0..1). */
   private strings = 0;
-  private aurora = [0, 1].map((i) => ({ phase: i * 2.6, drift: 0.05 + i * 0.04, y: 0.16 + i * 0.16, hueOff: (i - 0.5) * 40 }));
+  /**
+   * The Milky Way band (sustained sound). Positions along the band (u, -1.2..1.2)
+   * and across it (v); `depth` 0.5 = far layer, 1 = near layer (flows faster).
+   */
+  private band = {
+    flow: 0,
+    wave: 9, // position of the light wave running outward along the band (9 = none)
+    slow: 0, // slowly following strength, to notice held sound coming in
+    motes: Array.from({ length: 1600 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.4, b: Math.pow(Math.random(), 1.8), depth: Math.random() < 0.5 ? 0.5 : 1 })),
+    clouds: Array.from({ length: 30 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.22, r: 0.07 + Math.random() * 0.12, h: Math.random(), depth: Math.random() < 0.5 ? 0.5 : 1 })),
+    lanes: Array.from({ length: 11 }, () => ({ u: Math.random() * 2.4 - 1.2, v: gauss() * 0.12, r: 0.05 + Math.random() * 0.07, depth: Math.random() < 0.5 ? 0.5 : 1 })),
+  };
 
   constructor() {
     let seed = 11;
@@ -121,18 +145,19 @@ export class Cosmos {
     for (let i = 0; i < 4; i++) this.lanes.push(this.newLane());
     // Start with some dust already in the field, so the first frame isn't empty.
     for (let i = 0; i < 400; i++) this.spawn(Math.random(), 0.25, 8 + Math.random() * (FAR - 8));
+    for (const m of this.dust) m.age = undefined;
   }
 
   private newStar(z: number) {
     // Star colours by temperature: mostly white, some blue, a few gold and ember.
     const t = Math.random();
     const [hue, sat] = t < 0.55 ? [220, 10] : t < 0.8 ? [210, 55] : t < 0.93 ? [45, 60] : [20, 70];
-    const bright = Math.random() < 0.06 ? 1 : Math.pow(Math.random(), 2.2) * 0.7;
-    return { x: (Math.random() * 2 - 1) * 60, y: (Math.random() * 2 - 1) * 40, z, r: 0.4 + Math.random() * 1.1 + bright, hue, sat, tw: Math.random() * 6.28, bright };
+    const bright = Math.random() < 0.03 ? 0.8 : Math.pow(Math.random(), 2.4) * 0.6;
+    return { x: (Math.random() * 2 - 1) * 60, y: (Math.random() * 2 - 1) * 40, z, r: 0.4 + Math.random() * 0.9 + bright * 0.6, hue, sat, tw: Math.random() * 6.28, bright };
   }
 
   private newLane() {
-    return { ang: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.12, width: 0.12 + Math.random() * 0.3, life: 12 + Math.random() * 30 };
+    return { ang: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.12, width: 0.25 + Math.random() * 0.4, life: 12 + Math.random() * 30 };
   }
 
   resize(w: number, h: number, dpr: number) {
@@ -160,13 +185,16 @@ export class Cosmos {
   }
 
   /** Add one mote for a slice of the spectrum (f = 0 lowest … 1 highest). */
-  private spawn(f: number, level: number, z = FAR) {
+  private spawn(f: number, level: number, z = FAR - Math.random() * 6) {
     if (this.dust.length >= MAX_DUST) this.dust.shift();
-    // Most dust gathers into drifting lanes; the rest scatters freely.
-    const lane = this.lanes.length && Math.random() < 0.62 ? this.lanes[Math.floor(Math.random() * this.lanes.length)] : null;
-    const ang = lane ? lane.ang + (Math.random() - 0.5) * lane.width : Math.random() * Math.PI * 2;
-    // Low sounds close to the path, high sounds out at the edges.
-    const r = 0.25 + Math.pow(f, 0.85) * 3.2 + Math.random() * 0.35;
+    // Some dust gathers into loose drifting lanes; most scatters freely, so no
+    // shape repeats long enough to be noticed.
+    const lane = this.lanes.length && Math.random() < 0.3 ? this.lanes[Math.floor(Math.random() * this.lanes.length)] : null;
+    const ang = lane ? lane.ang + gauss() * lane.width : Math.random() * Math.PI * 2;
+    // Low sounds tend to stay close to the path and high sounds out at the
+    // edges, but each mote is scattered widely around its band's distance so
+    // the bands never line up into visible rings.
+    const r = Math.max(0.15, (0.25 + Math.pow(f, 0.85) * 3.2) * (0.65 + Math.random() * 0.7) + gauss() * 0.3);
     // Warm lows (the complement of the space hue), cool highs.
     const hue = lerpHue(this.warm, (this.hue + 30) % 360, Math.pow(f, 0.8));
     this.dust.push({
@@ -180,6 +208,7 @@ export class Cosmos {
       sx: 0,
       sy: 0,
       seen: false,
+      age: 0,
     });
   }
 
@@ -187,6 +216,22 @@ export class Cosmos {
    * Guitar: a strum releases a warm sweep of sparks along one of the dust
    * lanes, flying past like everything else. Grittier guitar, more sparks.
    */
+  /** A note of keys or another note instrument lights a star (see `noteStars`). */
+  private noteStar(p: number, v: number, d: number, lead: boolean) {
+    const pc = ((Math.round(p) % 12) + 12) % 12;
+    const ang = (pc / 12) * Math.PI * 2 - Math.PI / 2;
+    const r = 0.17 + clamp((p - 36) / 60) * 0.22 + (Math.random() - 0.5) * 0.02;
+    const x = Math.cos(ang) * r * 1.15;
+    const y = Math.sin(ang) * r;
+    const star: (typeof this.noteStars)[number] = { x, y, v: clamp(0.35 + v * 0.65), age: 0, life: clamp(d, 0.4, 2) + 0.4, hue: 38 + pc * 3 };
+    if (lead) {
+      if (this.lastLead && this.t - this.lastLead.t < 0.8) star.from = [this.lastLead.x, this.lastLead.y];
+      this.lastLead = { x, y, t: this.t };
+    }
+    this.noteStars.push(star);
+    if (this.noteStars.length > 160) this.noteStars.shift();
+  }
+
   private strum(p: number, v: number, single: boolean) {
     if (!single && this.t - this.lastChordAt < 0.12) return; // one sweep per strum
     this.lastChordAt = this.t;
@@ -206,15 +251,31 @@ export class Cosmos {
     const dt = f.dt;
     this.t += dt;
     const audible = f.audible ?? (f.idle ? 0 : 1);
-    this.calm += ((1 - audible) - this.calm) * (1 - Math.exp(-dt * (audible > 1 - this.calm ? 3 : 0.8)));
-    this.energy += (energyOf(f) * audible - this.energy) * (1 - Math.exp(-dt * 0.8));
+    // Everything wakes up within a fraction of a second when music starts, and
+    // settles slowly when it stops (that slow fall is what keeps it calm).
+    this.calm += ((1 - audible) - this.calm) * (1 - Math.exp(-dt * (audible > 1 - this.calm ? 10 : 0.8)));
+    // Energy from the sound itself (loudness against the song's own level,
+    // intensity, drums), so sections show; the recogniser's guess only when
+    // these measures are missing (a dropped song).
+    const drumsNow = Math.max(f.presence?.drums ?? 0, f.drumEvidence ?? 0);
+    const energyNow =
+      (f.intensity !== undefined ? clamp(0.1 + 0.5 * f.intensity + 0.3 * (f.swell ?? 0) + 0.2 * drumsNow) : energyOf(f)) * audible;
+    this.energy += (energyNow - this.energy) * (1 - Math.exp(-dt * (energyNow > this.energy ? 6 : 0.8)));
+    // The bass core swells with the bass, and with every kick.
+    const bassNow = f.level.bass * audible;
+    this.bass += (bassNow - this.bass) * (1 - Math.exp(-dt * (bassNow > this.bass ? 14 : 3)));
 
     for (const hh of f.hits) {
       if (hh.hit === 'kick' || hh.hit === 'tom') {
         this.surge = Math.max(this.surge, hh.v);
-        this.kickFlash = Math.max(this.kickFlash, hh.v);
+        // Without a steady beat to follow, strong kicks pulse the field themselves.
+        if (!f.beatLocked && hh.v > 0.5) {
+          this.kickFlash = Math.max(this.kickFlash, hh.v);
+          this.beatFlash = Math.max(this.beatFlash, hh.v);
+        }
         this.waves.push({ age: 0, v: hh.v });
-      } else if (hh.hit === 'snare') {
+      } else if (hh.hit === 'snare' && hh.v > 0.35) {
+        if (!f.beatLocked && hh.v > 0.5) this.beatFlash = Math.max(this.beatFlash, hh.v * 0.7);
         this.rings.push({ z: 9, r: 1.6 + Math.random() * 0.8, hue: (this.hue + 180) % 360, a: Math.pow(hh.v, 1.5), spin: Math.random() * 6 });
       } else if (hh.hit === 'hat') {
         // A burst of crisp glints on the halo around the edge of view.
@@ -222,6 +283,12 @@ export class Cosmos {
         const n = Math.round(2 + 8 * hh.v);
         for (let i = 0; i < n; i++) this.glints.push({ ang: base + (Math.random() - 0.5) * 2.4, r: 0.4 + Math.random() * 0.1, life: 0, max: 0.22 + Math.random() * 0.12, size: 0.3 + hh.v * 1.1 });
       } else this.shimmer = Math.max(this.shimmer, hh.v);
+    }
+    // On the beat: the whole field brightens and the bass core flashes, timed by
+    // the beat tracker to land as the beat is heard.
+    if (f.beat) {
+      this.beatFlash = Math.max(this.beatFlash, f.beat);
+      this.kickFlash = Math.max(this.kickFlash, f.beat * 0.9);
     }
     for (const n of f.notes) if (n.voice === 'bass') this.bassHit = Math.max(this.bassHit, 0.5 + n.v * 0.5);
 
@@ -242,6 +309,7 @@ export class Cosmos {
     for (const n of f.notes) {
       if (n.voice !== 'chords' && n.voice !== 'lead') continue;
       if (Math.random() < this.guitarness) this.strum(n.p, n.v, n.voice === 'lead');
+      else this.noteStar(n.p, n.v, n.d, n.voice === 'lead');
     }
 
     // Colour follows the mood of the music: chill music sits in soft deep
@@ -256,7 +324,7 @@ export class Cosmos {
     // Live listening measures intensity from the sound itself; a dropped song
     // estimates it from its hits, levels and mood.
     const target = f.intensity !== undefined ? f.intensity : clamp(0.08 + Math.min(1, hitRate / 5) * 0.4 + lvAvg * 0.3 + drums * 0.25 + (0.5 - calmMood) * 0.3) * audible;
-    this.intensity += (target - this.intensity) * (1 - Math.exp(-dt / (target > this.intensity ? 3 : 6)));
+    this.intensity += (target - this.intensity) * (1 - Math.exp(-dt / (target > this.intensity ? 0.6 : 6)));
     this.sat = 32 + this.intensity * 58;
     let nudge = 0;
     const chroma = f.spectrum?.chroma;
@@ -267,20 +335,24 @@ export class Cosmos {
     }
     this.hueTarget = (moodHue(this.intensity) + nudge + 360) % 360;
     const dh = ((this.hueTarget - this.hue + 540) % 360) - 180;
-    this.hue = (this.hue + dh * (1 - Math.exp(-dt * 0.5)) + 360) % 360;
+    this.hue = (this.hue + dh * (1 - Math.exp(-dt * 1.2)) + 360) % 360;
 
-    // Sustained, tonal sound (strings, pads, choirs) and its swell feed the aurora.
+    // Sustained, tonal sound (strings, pads, choirs) and its swell feed the Milky Way band.
     const tonalNow = f.tonal !== undefined ? f.tonal : clamp(((f.level.other + f.level.vocals) / 2) * (1 - f.level.drums * 0.6)) * audible;
-    this.tonal += (tonalNow - this.tonal) * (1 - Math.exp(-dt / (tonalNow > this.tonal ? 1.2 : 2.5)));
+    this.tonal += (tonalNow - this.tonal) * (1 - Math.exp(-dt / (tonalNow > this.tonal ? 0.4 : 2.5)));
     const swellNow = f.swell !== undefined ? f.swell : lvAvg * audible;
-    this.swell += (swellNow - this.swell) * (1 - Math.exp(-dt / 1.5));
+    this.swell += (swellNow - this.swell) * (1 - Math.exp(-dt / (swellNow > this.swell ? 0.4 : 1.5)));
     const strNow = f.presence ? clamp(Math.max(f.presence.strings, f.presence.synth * 0.5)) : 0;
     this.strings += (strNow - this.strings) * (1 - Math.exp(-dt / 2));
 
-    // Sung melody → the comet ahead.
+    // The melody line → the comet ahead: warm for a singing voice, cool for an
+    // instrument's melody (or a voice the recogniser missed).
     const c = this.comet;
     let sung: number | null = f.voice ? f.voice.p : null;
     for (const n of f.notes) if (n.voice === 'vocals') sung = n.p;
+    const isVoice = sung !== null;
+    if (sung === null && f.melody) sung = f.melody.p;
+    if (sung !== null) c.voice += ((isVoice ? 1 : 0) - c.voice) * (1 - Math.exp(-dt * 2));
     if (sung !== null) {
       c.target = sung;
       c.lastAt = this.t;
@@ -289,7 +361,8 @@ export class Cosmos {
     }
     const singing = this.t - c.lastAt < 0.6;
     c.p += (c.target - c.p) * (1 - Math.exp(-dt * 4));
-    c.lv += ((singing ? Math.max(0.4, f.level.vocals) : 0) - c.lv) * (1 - Math.exp(-dt * (singing ? 6 : 1.5)));
+    const melodyLevel = isVoice ? Math.max(0.4, f.level.vocals) : Math.max(0.3, f.level.other) * 0.8;
+    c.lv += ((singing ? melodyLevel : 0) - c.lv) * (1 - Math.exp(-dt * (singing ? 6 : 1.5)));
 
     // The whole spectrum becomes dust: louder bands emit more motes, and a
     // swelling passage makes the whole field bloom.
@@ -319,75 +392,102 @@ export class Cosmos {
     if (Math.random() < dt * (3 + 7 * this.calm)) this.spawn(Math.random(), 0.12 + Math.random() * 0.1);
   }
 
-  /** A vertical ray of aurora light: bright near the top, fading downward. */
-  private raySprite(hue: number) {
-    const h = Math.round(hue / 10) * 10;
-    const key = `ray${h}`;
+  /** A very soft round puff of light (no bright core, unlike the dust sprites): band clouds and note halos. */
+  private puffSprite(hue: number, sat = 70, light = 58) {
+    const h = Math.round(hue / 8) * 8;
+    const key = `puff${h}|${sat}|${light}`;
     const cache = (this.sprites as unknown as { cache: Map<string, HTMLCanvasElement> }).cache;
     let c = cache.get(key);
     if (!c) {
       c = document.createElement('canvas');
-      c.width = 4;
-      c.height = 128;
+      c.width = c.height = 64;
       const g = c.getContext('2d')!;
-      const grad = g.createLinearGradient(0, 0, 0, 128);
-      grad.addColorStop(0, `hsla(${h} 85% 75% / 0)`);
-      grad.addColorStop(0.1, `hsla(${h} 85% 72% / 0.9)`);
-      grad.addColorStop(0.35, `hsla(${h + 15} 80% 60% / 0.45)`);
-      grad.addColorStop(1, `hsla(${h + 30} 75% 45% / 0)`);
+      const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      for (let i = 0; i <= 6; i++) {
+        const u = i / 6;
+        grad.addColorStop(u, `hsla(${h} ${sat}% ${light}% / ${(0.5 * Math.exp(-u * u * 4.5)).toFixed(3)})`);
+      }
       g.fillStyle = grad;
-      g.fillRect(0, 0, 4, 128);
+      g.fillRect(0, 0, 64, 64);
       cache.set(key, c);
     }
     return c;
   }
 
   /**
-   * The aurora: curtains of fine vertical rays hanging from flowing curves,
-   * driven by sustained tonal sound (strings, pads, choirs, held notes). A
-   * swelling orchestra lifts, lengthens and brightens them; drum-led music
-   * keeps them faint. Brightness drifts along each curtain in patches.
+   * The Milky Way band: sustained, tonal sound (strings, pads, choirs, held
+   * notes) as a band of countless faint stars and soft light across the sky,
+   * with dark dust lanes. It is never a still picture:
+   *  - it flows along its length as you fly, its near layer faster than its
+   *    far one, so it has depth;
+   *  - when held sound comes in, a wave of light runs outward from its middle;
+   *  - its angle and gentle curve drift over minutes.
+   * Held sound makes it brighter and wider; drum-led music keeps it faint.
    */
-  private drawAurora(ctx: CanvasRenderingContext2D, dt: number) {
-    const { w, h, S } = this;
-    // Recognised strings (or pads) are exactly what the aurora is for: let them fill the sky.
+  private drawBand(ctx: CanvasRenderingContext2D, dt: number) {
+    const B = this.band;
     const strength = clamp(this.tonal * (0.45 + this.swell * 0.9) * (1 + this.strings * 0.7) * (1 - this.calm * 0.75));
+    // Held sound arriving: a light wave runs out along the band.
+    if (strength - B.slow > 0.12 && B.wave > 1.4) B.wave = 0;
+    B.slow += (strength - B.slow) * (1 - Math.exp(-dt / 2.5));
+    B.wave += dt * 0.55;
+    B.flow += dt * (0.006 + this.speed * 0.0022);
     if (strength < 0.02) return;
-    const step = Math.max(3, Math.round(4 * S));
-    for (const a of this.aurora) {
-      a.phase += dt * (0.12 + this.energy * 0.25) * (0.7 + a.drift * 6);
-      const hue = stopsHue(clamp(this.intensity), [
-        [0, 190],
-        [0.4, 250],
-        [0.7, 300],
-        [1, 335],
-      ]) + a.hueOff;
-      const sprite = this.raySprite((hue + 360) % 360);
-      const top0 = h * (a.y - this.swell * 0.05);
-      const len = h * (0.14 + strength * 0.26);
-      for (let x = -step; x < w + step; x += step) {
-        const u = x / w;
-        const top = top0 + Math.sin(u * 2.3 + a.phase) * h * 0.09 + Math.sin(u * 5.7 - a.phase * 0.7) * h * 0.03;
-        // Patches of brightness drifting along the curtain, plus fine ray texture.
-        const patch = clamp(0.5 + 0.5 * Math.sin(u * 5.3 + a.phase * 1.3) * Math.sin(u * 2.2 - a.phase * 0.5 + a.hueOff));
-        // Irregular rays: a hashed brightness per column that drifts slowly.
-        const col = Math.floor(x / step);
-        const n1 = hash(col * 1.7 + a.hueOff);
-        const ray = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(n1 * 40 + a.phase * (0.8 + n1)), 2);
-        const alpha = strength * patch * ray * 0.6;
-        if (alpha < 0.01) continue;
-        ctx.globalAlpha = alpha;
-        ctx.drawImage(sprite, x, top - len * 0.1, step * 1.3, len * (0.6 + 0.7 * hash(col * 3.1 + 7)));
-      }
+    const M = Math.max(this.w, this.h);
+    const S = this.S;
+    const hue = stopsHue(clamp(this.intensity), [
+      [0, 205],
+      [0.4, 250],
+      [0.7, 292],
+      [1, 325],
+    ]);
+    const width = M * (0.09 + 0.11 * strength);
+    const bend = Math.sin(this.t * 0.031) * 0.12;
+    const wrap = (u: number) => ((((u + 1.2) % 2.4) + 2.4) % 2.4) - 1.2;
+    const wave = (u: number) => (B.wave < 1.4 ? Math.exp(-Math.pow((Math.abs(u) - B.wave) / 0.14, 2)) * (1 - B.wave / 1.4) : 0);
+    const at = (u: number, v: number): [number, number] => [u * M * 0.75, v * width + bend * u * u * M * 0.25];
+    ctx.save();
+    ctx.rotate(-0.42 + Math.sin(this.t * 0.02) * 0.15);
+    // The glow: soft clouds of light, far ones dimmer.
+    for (const c of B.clouds) {
+      const u = wrap(c.u + B.flow * c.depth);
+      const edge = clamp((1.2 - Math.abs(u)) / 0.35);
+      // Clouds are stretched along the band, so it reads as one long river of light.
+      const R = M * c.r * 0.6 * (0.8 + 0.5 * strength) * (0.75 + 0.25 * c.depth);
+      const [x, y] = at(u, c.v);
+      ctx.globalAlpha = strength * 0.2 * edge * (0.6 + 0.4 * c.depth) * (1 + 1.5 * wave(u));
+      ctx.drawImage(this.puffSprite((hue + c.h * 40) % 360), x - R * 2.2, y - R * 0.6, R * 4.4, R * 1.2);
     }
+    // Countless faint stars packed into it, thickest along its middle.
+    ctx.fillStyle = `hsl(${(hue + 30) % 360} 35% 88%)`;
+    for (const m of B.motes) {
+      const u = wrap(m.u + B.flow * m.depth);
+      const a = strength * (0.3 + m.b * 0.7) * Math.exp(-m.v * m.v * 1.6) * clamp((1.2 - Math.abs(u)) / 0.3) * (1 + 2 * wave(u)) * (0.6 + 0.4 * m.depth);
+      if (a < 0.01) continue;
+      const [x, y] = at(u, m.v * 1.2);
+      const r = (0.9 + m.depth * 0.7 + m.b * 0.6) * S;
+      ctx.globalAlpha = clamp(a);
+      ctx.fillRect(x, y, r, r);
+    }
+    // Dark dust lanes through it.
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const l of B.lanes) {
+      const u = wrap(l.u + B.flow * l.depth);
+      const R = M * l.r;
+      const [x, y] = at(u, l.v);
+      ctx.globalAlpha = 0.3 * strength * clamp((1.2 - Math.abs(u)) / 0.35);
+      ctx.drawImage(this.puffSprite(0), x - R * 1.8, y - R * 0.5, R * 3.6, R);
+    }
+    ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   private step(dt: number) {
     const move = reduceMotion ? 0.5 : 1;
     // Cruise speed follows the energy; silence slows to a gentle float.
-    const cruise = (0.9 + this.energy * 10) * (1 - this.calm * 0.4) * move;
-    this.speed += (cruise - this.speed) * (1 - Math.exp(-dt * 1.5));
+    const cruise = (0.9 + this.energy * 6) * (1 - this.calm * 0.4) * move;
+    this.speed += (cruise - this.speed) * (1 - Math.exp(-dt * (cruise > this.speed ? 4 : 1.5)));
     const v = this.speed * (1 + this.surge * 2.2 * move);
     // The heading wanders: a new random direction every so often, eased in,
     // so the path curves and never repeats.
@@ -405,6 +505,7 @@ export class Cosmos {
     const sx = cam.vx * dt * move;
     const sy = cam.vy * dt * move;
     for (const m of this.dust) {
+      if (m.age !== undefined) m.age += dt;
       m.z -= v * dt;
       m.x -= sx;
       m.y -= sy;
@@ -451,8 +552,10 @@ export class Cosmos {
     this.rings = this.rings.filter((r) => r.z > NEAR);
     this.waves = this.waves.filter((w) => (w.age += dt) < 0.9);
     this.glints = this.glints.filter((g) => (g.life += dt) < g.max);
+    this.noteStars = this.noteStars.filter((st) => (st.age += dt) < st.life * 2.5);
     this.surge *= Math.exp(-dt * 6);
     this.kickFlash *= Math.exp(-dt * 7);
+    this.beatFlash *= Math.exp(-dt * 9);
     this.bassHit *= Math.exp(-dt * 5);
     this.shimmer *= Math.exp(-dt * 1.8);
     this.roll += dt * (0.008 + this.energy * 0.022) * move;
@@ -494,6 +597,28 @@ export class Cosmos {
     }
   }
 
+  /** What the scene is doing right now (for the debug recorder). */
+  debugState() {
+    return {
+      energy: this.energy,
+      intensity: this.intensity,
+      speed: this.speed,
+      calm: this.calm,
+      surge: this.surge,
+      beatFlash: this.beatFlash,
+      kickFlash: this.kickFlash,
+      bass: this.bass,
+      bassHit: this.bassHit,
+      hue: this.hue,
+      dust: this.dust.length,
+      guitarness: this.guitarness,
+      comet: this.comet.lv,
+      cometVoice: this.comet.voice,
+      noteStars: this.noteStars.length,
+      tonal: this.tonal,
+    };
+  }
+
   draw(ctx: CanvasRenderingContext2D, f: Frame) {
     if (f.reset) this.rings = [];
     this.listen(f);
@@ -510,7 +635,6 @@ export class Cosmos {
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = 'lighter';
-    this.drawAurora(ctx, f.dt);
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(this.roll);
@@ -528,18 +652,19 @@ export class Cosmos {
       const x = st.x * s;
       const y = st.y * s;
       if (Math.abs(x) > w || Math.abs(y) > h) continue;
-      const a = (0.25 + st.bright * 0.6) * (0.75 + 0.25 * Math.sin(this.t * (0.5 + st.bright) + st.tw)) + this.shimmer * 0.3;
-      const r = st.r * this.S * (0.6 + 40 / st.z);
+      const a = (0.16 + st.bright * 0.45) * (0.75 + 0.25 * Math.sin(this.t * (0.5 + st.bright) + st.tw)) * (1 + 0.5 * this.beatFlash) + this.shimmer * 0.2;
+      const r = st.r * this.S * (0.6 + 25 / st.z);
       ctx.fillStyle = `hsla(${st.hue} ${st.sat}% 88% / ${clamp(a)})`;
       ctx.fillRect(x - r / 2, y - r / 2, r, r);
     }
+    this.drawBand(ctx, f.dt);
     this.drawSights(ctx, F, live);
 
     // The bass core at the vanishing point.
-    const coreR = Math.min(w, h) * (0.05 + this.bass * 0.22 + this.bassHit * 0.08) * (0.45 + live * 0.55);
+    const coreR = Math.min(w, h) * (0.05 + this.bass * 0.22 + this.bassHit * 0.08 + this.kickFlash * 0.05) * (0.45 + live * 0.55);
     const core = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR * 3.2);
     const ch = this.warm;
-    core.addColorStop(0, `hsla(${ch + 20} ${this.sat}% 72% / ${0.08 + this.bass * 0.22 + this.kickFlash * 0.08})`);
+    core.addColorStop(0, `hsla(${ch + 20} ${this.sat}% 72% / ${0.08 + this.bass * 0.22 + this.kickFlash * 0.3})`);
     core.addColorStop(0.2, `hsla(${ch} ${this.sat}% 50% / ${0.06 + this.bass * 0.2 + this.bassHit * 0.08})`);
     core.addColorStop(0.55, `hsla(${ch} 85% 45% / ${0.03 + this.bass * 0.07})`);
     core.addColorStop(1, `hsla(${ch} 80% 40% / 0)`);
@@ -566,9 +691,11 @@ export class Cosmos {
     for (const r of this.rings) {
       const s = F / r.z;
       const R = r.r * s;
-      const a = r.a * clamp((FAR * 0.5 - r.z) / 4) * clamp(r.z / 1.2);
-      ctx.strokeStyle = `hsla(${r.hue} 70% 82% / ${a})`;
-      ctx.lineWidth = Math.max(1.2 * S, 0.014 * s);
+      // Faint and fine, and gone before the ring grows past the edge of view.
+      const a = 0.4 * r.a * clamp((9 - r.z) / 1.2 + 0.3) * clamp((r.z - 1.5) / 3);
+      if (a <= 0.003) continue;
+      ctx.strokeStyle = `hsla(${r.hue} 60% 82% / ${a})`;
+      ctx.lineWidth = Math.max(0.9 * S, 0.008 * s);
       ctx.lineCap = 'round';
       ctx.setLineDash([0.001, 0.07 * s]);
       ctx.lineDashOffset = r.spin * s;
@@ -584,13 +711,20 @@ export class Cosmos {
       const s = F / m.z;
       const x = m.x * s;
       const y = m.y * s;
-      const fadeIn = clamp((FAR - m.z) / 6);
-      // Motes dissolve before they reach you instead of ballooning into blobs.
-      const fadeOut = clamp((m.z - NEAR) / 3.5);
-      const a = Math.max(m.a, 0.55 * this.calm) * fadeIn * fadeOut * (0.3 + live * 0.38);
-      const R = Math.max(0.6 * S, Math.min(22 * S, m.size * s * 0.8));
+      // A mote lights up the instant its sound plays (a short flash, stronger for
+      // louder sounds), so what you see is in time with what you hear; then it
+      // settles into the dim stream drifting towards you.
+      const age = m.age ?? 9;
+      const born = clamp(age / 0.08);
+      const flash = clamp((m.a - 0.3) / 0.7) * Math.exp(-age / 0.25);
+      const haze = 0.55 + 0.45 * clamp((FAR - m.z) / 9);
+      // Motes dissolve well before they reach you, so the nearest (largest) ones
+      // stay soft background instead of pulling the eye.
+      const fadeOut = Math.pow(clamp((m.z - NEAR) / 7), 1.5);
+      const a = Math.max(m.a, 0.55 * this.calm) * born * haze * fadeOut * (0.26 + live * 0.36) * (1 + 1.8 * flash) * (1 + 0.7 * this.beatFlash);
+      const R = Math.max(0.6 * S, Math.min(15 * S, m.size * s * 0.75)) * (1 + 0.6 * flash);
       if (streak && m.seen) {
-        ctx.strokeStyle = `hsla(${m.hue} 85% ${m.light}% / ${a * 0.55})`;
+        ctx.strokeStyle = `hsla(${m.hue} 85% ${m.light}% / ${a * 0.4})`;
         ctx.lineWidth = Math.min(3 * S, Math.max(0.7 * S, R * 0.35));
         ctx.lineCap = 'round';
         ctx.beginPath();
@@ -627,9 +761,38 @@ export class Cosmos {
       ctx.fillRect(x - S, y - S, 2 * S, 2 * S);
     }
 
-    // The sung melody: a comet ahead, its trail drifting past you.
+    // Notes of keys and other note instruments: stars that bloom and fade.
+    for (const st of this.noteStars) {
+      const a = st.v * (st.age < 0.03 ? st.age / 0.03 : Math.exp(-(st.age - 0.03) / (st.life * 0.45)));
+      if (a < 0.01) continue;
+      const x = st.x * M;
+      const y = st.y * M;
+      if (st.from) {
+        ctx.strokeStyle = `hsla(${st.hue} 70% 82% / ${a * 0.45})`;
+        ctx.lineWidth = 0.8 * S;
+        ctx.beginPath();
+        ctx.moveTo(st.from[0] * M, st.from[1] * M);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      }
+      // A star like the others in the sky, only brighter: a small cream-white
+      // point with a soft halo, blooming for a moment as the note sounds.
+      const bloom = Math.exp(-st.age / 0.1);
+      const R = (3 + 4 * st.v) * S * (1 + 0.8 * bloom);
+      ctx.globalAlpha = clamp(a * (0.55 + 0.45 * bloom));
+      ctx.drawImage(this.puffSprite(st.hue, 35, 80), x - R * 2, y - R * 2, R * 4, R * 4);
+      ctx.globalAlpha = 1;
+      const core = (1.1 + 1.1 * st.v + bloom) * S;
+      ctx.fillStyle = `hsla(${st.hue} 30% 96% / ${clamp(a * 1.2)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, core, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // The melody line: a comet ahead, its trail drifting past you.
     const c = this.comet;
     if (c.lv > 0.02) {
+      const cometHue = lerpHue(32, 190, 1 - c.voice);
       const range = Math.max(10, c.hi - c.lo);
       const pitch = clamp((c.p - c.lo) / range);
       const z = 5;
@@ -640,11 +803,11 @@ export class Cosmos {
       c.y += (ty - c.y) * 0.08;
       if (Math.random() < 0.9) {
         if (this.dust.length >= MAX_DUST) this.dust.shift();
-        this.dust.push({ x: c.x + (Math.random() - 0.5) * 0.05, y: c.y + (Math.random() - 0.5) * 0.05, z, size: 0.03 * (0.5 + c.lv), hue: 32, light: 74, a: 0.8 * c.lv, sx: 0, sy: 0, seen: false });
+        this.dust.push({ x: c.x + (Math.random() - 0.5) * 0.05, y: c.y + (Math.random() - 0.5) * 0.05, z, size: 0.03 * (0.5 + c.lv) * (0.6 + 0.4 * c.voice), hue: cometHue, light: 74, a: 0.8 * c.lv, sx: 0, sy: 0, seen: false });
       }
-      const R = (10 + 18 * c.lv) * S;
+      const R = (10 + 18 * c.lv) * S * (0.7 + 0.3 * c.voice);
       ctx.globalAlpha = clamp(c.lv * 1.4);
-      ctx.drawImage(this.sprites.get(34, 82), c.x * s - R * 2, c.y * s - R * 2, R * 4, R * 4);
+      ctx.drawImage(this.sprites.get(cometHue + 2, 82), c.x * s - R * 2, c.y * s - R * 2, R * 4, R * 4);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
@@ -690,8 +853,3 @@ function gauss() {
   return Math.sqrt(-2 * Math.log(Math.random() + 1e-9)) * Math.cos(2 * Math.PI * Math.random());
 }
 
-/** Deterministic 0..1 noise for a number. */
-function hash(x: number) {
-  const s = Math.sin(x * 127.1 + 311.7) * 43758.5453;
-  return s - Math.floor(s);
-}

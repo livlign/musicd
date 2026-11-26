@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-120 -120 240 240" width="32" height="32" role="img" aria-label="musicd"><title>musicd</title><defs>
+    <radialGradient id="frec" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3a3f66"/><stop offset="1" stop-color="#2a2d4c"/></radialGradient>
+    <radialGradient id="fwg" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse"><stop offset=".05" stop-color="#dffaff"/><stop offset=".32" stop-color="#8fe8ff"/><stop offset="1" stop-color="#6a5cf0"/></radialGradient>
+    <radialGradient id="flg" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8fe8ff" stop-opacity=".9"/><stop offset=".55" stop-color="#8fe8ff" stop-opacity=".6"/><stop offset="1" stop-color="#6a5cf0" stop-opacity=".7"/></radialGradient>
+    <filter id="fbl" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="fha" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="10"/></filter>
+    <filter id="fsf" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"/></filter>
+    <clipPath id="fdisc"><circle r="100"/></clipPath>
+    <mask id="fcut" maskUnits="userSpaceOnUse" x="-130" y="-130" width="260" height="260">
+      <rect x="-130" y="-130" width="260" height="260" fill="#fff"/>
+      <path d="M-82.734 -57.931L0 0L19.272 -99.144" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round"/><path d="M19.272 -99.144L0 0L96.057 -31.211" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round"/><path d="M96.057 -31.211L0 0L73.867 68.882" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round"/><path d="M73.867 68.882L0 0L-14.056 100.017" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round"/><path d="M-14.056 100.017L0 0L-82.734 57.931" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+      <circle r="9" fill="#000"/>
+    </mask>
+    <mask id="fwcut" maskUnits="userSpaceOnUse" x="-130" y="-130" width="260" height="260">
+      <rect x="-130" y="-130" width="260" height="260" fill="#fff"/>
+      <path d="M-82.734 57.931L0 0L-82.734 -57.931" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+      <circle r="9" fill="#000"/>
+    </mask></defs>
+  <g mask="url(#fcut)"><clipPath id="fp0"><path d="M0 0L-81.915 -57.358A100 100 0 0 1 19.081 -98.163Z"/></clipPath><g clip-path="url(#fp0)"><path d="M0 0L-81.915 -57.358A100 100 0 0 1 19.081 -98.163Z" fill="url(#frec)"/></g><clipPath id="fp1"><path d="M0 0L19.081 -98.163A100 100 0 0 1 95.106 -30.902Z"/></clipPath><g clip-path="url(#fp1)"><path d="M0 0L19.081 -98.163A100 100 0 0 1 95.106 -30.902Z" fill="url(#frec)"/></g><clipPath id="fp2"><path d="M0 0L95.106 -30.902A100 100 0 0 1 73.135 68.2Z"/></clipPath><g clip-path="url(#fp2)"><path d="M0 0L95.106 -30.902A100 100 0 0 1 73.135 68.2Z" fill="url(#frec)"/></g><clipPath id="fp3"><path d="M0 0L73.135 68.2A100 100 0 0 1 -13.917 99.027Z"/></clipPath><g clip-path="url(#fp3)"><path d="M0 0L73.135 68.2A100 100 0 0 1 -13.917 99.027Z" fill="url(#frec)"/></g><clipPath id="fp4"><path d="M0 0L-13.917 99.027A100 100 0 0 1 -81.915 57.358Z"/></clipPath><g clip-path="url(#fp4)"><path d="M0 0L-13.917 99.027A100 100 0 0 1 -81.915 57.358Z" fill="url(#frec)"/></g></g>
+  <g opacity=".62"><g filter="url(#fbl)"><line x1="-4.915" y1="-3.441" x2="-81.506" y2="-57.071" stroke="url(#flg)" stroke-width="6" stroke-linecap="round"/><line x1="1.145" y1="-5.89" x2="18.985" y2="-97.672" stroke="url(#flg)" stroke-width="6" stroke-linecap="round"/><line x1="5.706" y1="-1.854" x2="94.63" y2="-30.747" stroke="url(#flg)" stroke-width="6" stroke-linecap="round"/><line x1="4.388" y1="4.092" x2="72.77" y2="67.859" stroke="url(#flg)" stroke-width="6" stroke-linecap="round"/><line x1="-0.835" y1="5.942" x2="-13.848" y2="98.532" stroke="url(#flg)" stroke-width="6" stroke-linecap="round"/><line x1="-4.915" y1="3.441" x2="-81.506" y2="57.071" stroke="url(#flg)" stroke-width="6" stroke-linecap="round"/></g></g>
+  <g transform="translate(0 0)"><g mask="url(#fwcut)"><path d="M0 0L-81.915 57.358A100 100 0 0 1 -81.915 -57.358Z" fill="url(#fwg)"/></g></g>
+  </svg>

@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>musicd · logo ideas, round 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;650&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #030308; --cream: #f3d9a8; --warm: #ff9a3c; --cool: #5cc8ff;
+    --panel: #0a0a12; --line: #1b1b28; --text: #ece6da; --muted: #8b8698;
+    --brand: "Unbounded", ui-rounded, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ink); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+  /* Brand surfaces. Marks read their colours from these. */
+  .ink   { --surface: #030308; --fg: #f3d9a8; --deep: #161624; --rim: rgba(243,217,168,.22); --blend: screen; background: var(--surface); }
+  .cream { --surface: #f3d9a8; --fg: #0d0c14; --deep: #0d0c14; --rim: rgba(13,12,20,0); --blend: normal; background: var(--surface); color: #0d0c14; }
+
+  header { max-width: 1180px; margin: 0 auto; padding: 44px 28px 26px; display: flex; flex-wrap: wrap;
+    gap: 18px 40px; align-items: end; justify-content: space-between; }
+  h1 { font: 650 26px/1.2 var(--brand); letter-spacing: -0.03em; margin: 0 0 8px; }
+  h1 span { color: var(--muted); font-weight: 500; }
+  header p { margin: 0; color: var(--muted); max-width: 600px; text-wrap: pretty; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button, .chk { font: inherit; font-size: 13px; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    display: inline-flex; gap: 7px; align-items: center; }
+  button:hover, .chk:hover { border-color: var(--muted); }
+  button.on { border-color: var(--cream); }
+  .chk input { margin: 0; accent-color: var(--warm); }
+  .pill { font-size: 13px; padding: 7px 12px; border-radius: 999px; min-width: 140px; text-align: center;
+    background: color-mix(in oklab, var(--warm) 14%, transparent); color: var(--warm); transition: .3s; }
+  .pill.silent { background: color-mix(in oklab, var(--muted) 14%, transparent); color: var(--muted); }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 0 28px 20px; display: grid; gap: 20px; }
+  .board { display: grid; grid-template-columns: 380px 1fr; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 22px; overflow: hidden; }
+  .stage { display: grid; place-items: center; min-height: 400px; border-right: 1px solid var(--line); }
+  .stage svg { overflow: visible; }
+  .info { padding: 26px 30px 26px; display: flex; flex-direction: column; gap: 14px; }
+  .title { display: flex; align-items: baseline; gap: 12px; }
+  .num { font: 650 13px/1 var(--brand); color: var(--ink); background: var(--cream); border-radius: 7px; padding: 5px 8px; }
+  h2 { margin: 0; font: 650 22px/1.2 var(--brand); letter-spacing: -0.03em; }
+  .line { margin: 0; font: 500 16px/1.4 var(--brand); letter-spacing: -0.02em; color: var(--cream); }
+  .why { margin: 0; color: var(--muted); max-width: 640px; text-wrap: pretty; }
+  .from { font-size: 12px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+
+  .kit { margin-top: auto; display: grid; grid-template-columns: auto auto 1fr; gap: 12px; align-items: stretch; }
+  .tile { border-radius: 14px; padding: 12px; display: grid; place-items: center; border: 1px solid var(--line); }
+  .icon { width: 104px; height: 104px; display: grid; place-items: center; border-radius: 24px; }
+  .tile small { font-size: 11px; color: var(--muted); }
+  .cream small { color: #6f6150; }
+  .appicons { display: flex; gap: 12px; }
+  .appicons > div { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .tabs { display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 12px 14px; }
+  .tab { display: flex; align-items: center; gap: 8px; background: #14141f; border-radius: 8px 8px 0 0;
+    padding: 6px 12px 6px 10px; font-size: 12px; color: #cfc8bb; width: max-content; }
+  .tab.b { background: #e9e5dc; color: #2a2733; }
+  .tab svg { display: block; }
+  .lockups { display: grid; gap: 10px; }
+  .lockup { border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 14px 18px; border: 1px solid var(--line); }
+  .lockup b { font: 650 30px/1 var(--brand); letter-spacing: -0.045em; color: var(--fg); }
+  .lockup.d { gap: 0; }
+  .lockup.d b { margin-right: 1px; }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 10px 0 44px; }
+  kbd { font: inherit; border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+  @media (max-width: 920px) {
+    .board { grid-template-columns: 1fr; } .stage { border-right: 0; border-bottom: 1px solid var(--line); }
+    .kit { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>musicd <span>· round 2</span></h1>
+    <p>Building on A (shards) and E (pieces that drift apart in silence). Each mark now carries one idea of
+      its own, uses flat brand colours (ink, cream, warm for bass, cool for treble), and parks upright when the
+      music stops, so the resting state is designed too. Every board shows the mark large, as app icons, as
+      a favicon in a browser tab, and with the wordmark.</p>
+  </div>
+  <div class="controls">
+    <span id="status" class="pill">♪ playing</span>
+    <button id="play" title="Space">Silence</button>
+    <button id="again" title="R">Reassemble</button>
+    <label class="chk"><input type="checkbox" id="auto" checked> Auto demo</label>
+    <button id="mic">Listen to mic</button>
+  </div>
+</header>
+<main id="boards"></main>
+<footer><kbd>Space</kbd> play / silence · <kbd>R</kbd> reassemble · auto demo plays 6 s, then 4 s of silence</footer>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg', D = Math.PI / 180, TAU = Math.PI * 2;
+const WARM = '#ff9a3c', COOL = '#5cc8ff';
+const MAX_SPEED = 120, SPIN_UP = 0.7, COAST = 1.9;   // deg/s, seconds to speed, nominal seconds to stop
+let uidN = 0; const uid = () => ++uidN;
+
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) {
+    const v = attrs[k];
+    if (typeof v === 'string' && v.startsWith('var(')) e.style.setProperty(k, v); else e.setAttribute(k, v);
+  }
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const f = n => (Math.round(n * 100) / 100).toString();
+const pol = (r, a) => [r * Math.sin(a * D), -r * Math.cos(a * D)];
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const ease = t => 1 - Math.pow(1 - clamp01(t), 3);
+const snap = t => { t = clamp01(t); const c = 1.5; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+const rng = s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+const fade = (G, delay, k = 4) => f(clamp01((G.asm - delay) * k));
+
+function sector(r0, r1, a0, a1) {
+  const lg = a1 - a0 > 180 ? 1 : 0, [x0, y0] = pol(r1, a0), [x1, y1] = pol(r1, a1);
+  if (r0 <= 0) return `M0 0L${f(x0)} ${f(y0)}A${r1} ${r1} 0 ${lg} 1 ${f(x1)} ${f(y1)}Z`;
+  const [x2, y2] = pol(r0, a1), [x3, y3] = pol(r0, a0);
+  return `M${f(x0)} ${f(y0)}A${r1} ${r1} 0 ${lg} 1 ${f(x1)} ${f(y1)}L${f(x2)} ${f(y2)}A${r0} ${r0} 0 ${lg} 0 ${f(x3)} ${f(y3)}Z`;
+}
+function arc(r, a0, a1) {
+  const [x0, y0] = pol(r, a0), [x1, y1] = pol(r, a1);
+  return `M${f(x0)} ${f(y0)}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${f(x1)} ${f(y1)}`;
+}
+// A flat shard: solid fill, cut from its neighbours by a gap in the surface colour, two groove lines.
+function shard(parent, r0, r1, a0, a1, fill, grooveRadii = [], seam = 3) {
+  const g = el('g', {}, parent);
+  const d = sector(r0, r1, a0, a1);
+  el('path', { d, fill }, g);
+  for (const r of grooveRadii) {
+    const pad = (seam / r) / D;
+    el('path', { d: arc(r, a0 + pad, a1 - pad), fill: 'none', stroke: 'var(--surface)', 'stroke-width': 1.5, opacity: .55 }, g);
+  }
+  el('path', { d, fill: 'none', stroke: 'var(--surface)', 'stroke-width': seam, 'stroke-linejoin': 'round' }, g);
+  return g;
+}
+
+/* ───────── 1 · Play piece ───────── */
+function playPiece(svg) {
+  const R = rng(4), root = el('g', {}, svg), P = [];
+  const W0 = 235, W1 = 305;                         // the wedge on the left: a ▶ pointing at the centre
+  const cuts = [305, 371, 432, 493, 548, 595];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const a0 = cuts[i], a1 = cuts[i + 1];
+    const g = shard(root, 0, 100, a0, a1, 'var(--fg)', [64, 82]);
+    const [dx, dy] = pol(110 + R() * 60, (a0 + a1) / 2 + (R() - .5) * 40);
+    P.push({ g, dx, dy, rot: (R() - .5) * 120, delay: .08 + i * .08 });
+  }
+  const wedge = shard(root, 0, 100, W0, W1, WARM, [64, 82]);
+  el('circle', { r: 5.5, fill: 'var(--surface)' }, root);
+  return G => {
+    root.setAttribute('transform', `rotate(${f(G.angle)})`);
+    for (const p of P) {
+      const k = snap((G.asm - p.delay) / .8), q = 1 - k;
+      p.g.setAttribute('transform', `translate(${f(p.dx * q)} ${f(p.dy * q)}) rotate(${f(p.rot * q)})`);
+      p.g.setAttribute('opacity', fade(G, p.delay));
+    }
+    // The wedge arrives last, and leaves (left, pointing back in) when the music stops.
+    const k = snap((G.asm - .75) / .7);
+    const out = (1 - k) * 150 + 34 * G.apart * k;
+    wedge.setAttribute('transform', `translate(${f(-out)} 0)`);
+    wedge.setAttribute('opacity', fade(G, .75));
+  };
+}
+
+/* ───────── 2 · Tonearm d ───────── */
+function tonearmD(svg) {
+  const R = rng(8), all = el('g', { transform: 'translate(11 4)' }, svg), P = [];
+  const CX = -22, CY = 28, RD = 72;
+  const discPos = el('g', { transform: `translate(${CX} ${CY})` }, all), disc = el('g', {}, discPos);
+  const cuts = [0, 68, 131, 197, 262, 318, 360];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const g = shard(disc, 0, RD, cuts[i], cuts[i + 1], 'var(--fg)', [46, 59], 3.2);
+    const [dx, dy] = pol(90 + R() * 60, (cuts[i] + cuts[i + 1]) / 2 + (R() - .5) * 40);
+    P.push({ g, dx, dy, rot: (R() - .5) * 120, delay: .08 + i * .08 });
+  }
+  const label = el('g', {}, disc);
+  el('path', { d: sector(0, 19, 0, 180), fill: WARM }, label);
+  el('path', { d: sector(0, 19, 180, 360), fill: COOL }, label);
+  el('circle', { r: 3.4, fill: 'var(--surface)' }, label);
+  // Stem of the d = the tonearm, hinged at its top.
+  const PX = 63, PY = -100, arm = el('g', {}, all);
+  el('rect', { x: 54, y: -104, width: 18, height: 204, rx: 9, fill: 'var(--fg)' }, arm);
+  el('circle', { cx: PX, cy: PY, r: 15, fill: 'var(--fg)' }, arm);
+  el('circle', { cx: PX, cy: PY, r: 5, fill: 'var(--surface)' }, arm);
+  return G => {
+    disc.setAttribute('transform', `rotate(${f(G.angle)})`);
+    for (const p of P) {
+      const k = snap((G.asm - p.delay) / .8), q = 1 - k;
+      p.g.setAttribute('transform', `translate(${f(p.dx * q)} ${f(p.dy * q)}) rotate(${f(p.rot * q)})`);
+      p.g.setAttribute('opacity', fade(G, p.delay));
+    }
+    const kl = snap((G.asm - .55) / .5);
+    label.setAttribute('transform', `scale(${f(kl)})`);
+    const ka = ease((G.asm - .8) / .7);
+    arm.setAttribute('transform', `rotate(${f(-55 * (1 - ka) - 17 * G.apart)} ${PX} ${PY})`);
+    arm.setAttribute('opacity', fade(G, .8));
+  };
+}
+
+/* ───────── 3 · Flatline ───────── */
+function flatline(svg) {
+  const id = `fl${uid()}`, root = el('g', {}, svg);
+  el('circle', { r: 100 }, el('clipPath', { id }, svg));
+  const half = c => {
+    const g = el('g', {}, root), inner = el('g', { 'clip-path': `url(#${id})` }, g);
+    return { g, inner, path: el('path', { fill: c }, inner) };
+  };
+  const top = half(WARM), bot = half(COOL);
+  // Thin groove lines, cut through both halves.
+  for (const h of [top, bot]) for (const r of [62, 82])
+    el('circle', { r, fill: 'none', stroke: 'var(--surface)', 'stroke-width': 1.5, opacity: .5 }, h.inner);
+  const hole = el('circle', { r: 5.5, fill: 'var(--surface)' }, root);
+  const xs = []; for (let x = -104; x <= 104; x += 4) xs.push(x);
+  return G => {
+    root.setAttribute('transform', `rotate(${f(G.angle)})`);
+    const amp = G.play * (4 + 11 * G.level + 6 * G.beat);
+    const gap = 2.6 + 9 * G.apart;
+    const seam = xs.map(x => { const u = x / 104; return amp * Math.sin(u * Math.PI * 3.2 + G.t * 7) * (1 - u * u); });
+    const line = (off) => xs.map((x, i) => `${x} ${f(seam[i] + off)}`).reverse().join('L');
+    top.path.setAttribute('d', `M-110 -130L110 -130L${line(-gap / 2)}Z`);
+    bot.path.setAttribute('d', `M-110 130L110 130L${line(gap / 2)}Z`);
+    const k = snap((G.asm - .1) / .9), q = 1 - k;
+    top.g.setAttribute('transform', `translate(0 ${f(-150 * q)})`);
+    bot.g.setAttribute('transform', `translate(0 ${f(150 * q)})`);
+    top.g.setAttribute('opacity', fade(G, .1)); bot.g.setAttribute('opacity', fade(G, .1));
+    hole.setAttribute('opacity', f(clamp01((G.asm - .8) * 4) * (1 - G.apart)));
+  };
+}
+
+/* ───────── 4 · Light leak ───────── */
+function lightLeak(svg) {
+  const id = uid(), R = rng(12), root = el('g', {}, svg), P = [];
+  const defs = el('defs', {}, svg);
+  const lg = el('linearGradient', { id: `lg${id}`, gradientUnits: 'userSpaceOnUse', x1: -100, y1: 0, x2: 100, y2: 0 }, defs);
+  el('stop', { offset: 0, 'stop-color': WARM }, lg); el('stop', { offset: 1, 'stop-color': COOL }, lg);
+  const rg = el('radialGradient', { id: `rg${id}` }, defs);
+  el('stop', { offset: 0, 'stop-color': '#fff6e2' }, rg); el('stop', { offset: .6, 'stop-color': WARM }, rg);
+  el('stop', { offset: 1, 'stop-color': '#ff6a3c' }, rg);
+  const blur = el('filter', { id: `bl${id}`, x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+  el('feGaussianBlur', { stdDeviation: 4.5 }, blur);
+
+  const cuts = [8, 66, 131, 178, 239, 301, 368], RING = 58, CORE = 22;
+  const light = `url(#lg${id})`;
+  // Light first, so it shows through the gaps between the dark shards above it.
+  const glow = el('g', { filter: `url(#bl${id})` }, root), crisp = el('g', {}, root), rays = el('g', {}, root);
+  const drawSeams = (g, w) => {
+    for (const a of cuts.slice(0, -1)) { const [x0, y0] = pol(CORE, a), [x1, y1] = pol(100, a);
+      el('line', { x1: f(x0), y1: f(y0), x2: f(x1), y2: f(y1), stroke: light, 'stroke-width': w, 'stroke-linecap': 'round' }, g); }
+    el('circle', { r: RING, fill: 'none', stroke: light, 'stroke-width': w }, g);
+  };
+  drawSeams(glow, 9); drawSeams(crisp, 3.2);
+  const rayEls = cuts.slice(0, -1).map(a => ({ a, e: el('line', { stroke: light, 'stroke-width': 2.4, 'stroke-linecap': 'round' }, rays) }));
+  for (let i = 0; i < cuts.length - 1; i++) for (const [r0, r1] of [[CORE + 1.6, RING - 1.6], [RING + 1.6, 100]]) {
+    const pad0 = (1.6 / r0) / D, a0 = cuts[i] + pad0, a1 = cuts[i + 1] - pad0;
+    const g = el('g', {}, root);
+    el('path', { d: sector(r0, r1, a0, a1), fill: 'var(--deep)', stroke: 'var(--rim)', 'stroke-width': .8 }, g);
+    const mid = (a0 + a1) / 2, [ux, uy] = pol(1, mid);
+    P.push({ g, ux, uy, drift: r1 === 100 ? 7 : 4, fly: 100 + R() * 60, rot: (R() - .5) * 90, delay: .08 + i * .06 + (r1 === 100 ? .12 : 0) });
+  }
+  const core = el('circle', { r: CORE - 2, fill: `url(#rg${id})` }, root);
+  el('circle', { r: 3.4, fill: 'var(--surface)' }, root);
+  return G => {
+    root.setAttribute('transform', `rotate(${f(G.angle)})`);
+    for (const p of P) {
+      const k = snap((G.asm - p.delay) / .8), q = 1 - k, d = p.fly * q + p.drift * G.apart * k;
+      p.g.setAttribute('transform', `translate(${f(p.ux * d)} ${f(p.uy * d)}) rotate(${f(p.rot * q)})`);
+      p.g.setAttribute('opacity', fade(G, p.delay));
+    }
+    const lit = clamp01((G.asm - .9) * 2);
+    const I = lit * (.1 + .9 * clamp01(G.play * (.35 + .65 * G.level)));
+    crisp.setAttribute('opacity', f(I));
+    glow.setAttribute('opacity', f(I * (.55 + .45 * G.beat)));
+    const L = 28 * G.beat * G.play * lit;
+    for (const r of rayEls) { const [x0, y0] = pol(104, r.a), [x1, y1] = pol(104 + L, r.a);
+      r.e.setAttribute('x1', f(x0)); r.e.setAttribute('y1', f(y0)); r.e.setAttribute('x2', f(x1)); r.e.setAttribute('y2', f(y1));
+      r.e.setAttribute('opacity', f(L > 1 ? .9 : 0)); }
+    core.setAttribute('opacity', f(.35 + .65 * I));
+    core.setAttribute('transform', `scale(${f(ease(G.asm / .5) * (1 + .1 * G.beat * G.play))})`);
+  };
+}
+
+/* ───────── 5 · Misprint ───────── */
+function misprint(svg) {
+  const R = rng(31), layers = [];
+  svg.style.isolation = 'isolate';
+  const cuts = [20, 94, 152, 214, 288, 380];
+  for (const [color, sx, sy, from] of [['#3a9fb0', 7, 4, 1], [WARM, -7, -4, -1]]) {
+    const shift = el('g', { style: 'mix-blend-mode: var(--blend)' }, svg), spin = el('g', {}, shift), P = [];
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const a0 = cuts[i] + .9, a1 = cuts[i + 1] - .9, g = el('g', {}, spin);
+      el('path', { d: sector(30, 100, a0, a1), fill: color }, g);
+      const [ux, uy] = pol(1, (a0 + a1) / 2);
+      P.push({ g, ux, uy, jx: (R() - .5) * 8, jy: (R() - .5) * 8, jr: (R() - .5) * 7, delay: .1 + i * .07 + (from > 0 ? .12 : 0) });
+    }
+    const dot = el('circle', { r: 13, fill: color }, spin);
+    layers.push({ shift, spin, P, sx, sy, from, dot });
+  }
+  return G => {
+    for (const L of layers) {
+      const k0 = ease((G.asm - .05) / 1.1);
+      const off = (1 - k0) * 120 * L.from, s = G.apart;
+      L.shift.setAttribute('transform', `translate(${f(L.sx * s + off)} ${f(L.sy * s + off * .3)})`);
+      L.spin.setAttribute('transform', `rotate(${f(G.angle)})`);
+      for (const p of L.P) {
+        const k = snap((G.asm - p.delay) / .8), q = 1 - k, d = 40 * q + 3 * s;
+        p.g.setAttribute('transform', `translate(${f(p.ux * d + p.jx * s)} ${f(p.uy * d + p.jy * s)}) rotate(${f(p.jr * s)})`);
+        p.g.setAttribute('opacity', fade(G, p.delay, 3));
+      }
+      L.dot.setAttribute('transform', `scale(${f(snap((G.asm - .7) / .5))})`);
+    }
+  };
+}
+
+const IDEAS = [
+  { n: 1, name: 'Play piece', build: playPiece, from: 'A shards + E silence',
+    line: 'The record is only whole while music plays.',
+    why: 'The missing wedge is a play button. When the music stops, the disc parks upright and the wedge slides out, so the resting logo still says "press play". When sound comes in, the wedge clicks home and the whole record spins.' },
+  { n: 2, name: 'Tonearm d', build: tonearmD, from: 'A shards', d: true,
+    line: 'The logo is the d in musicd.',
+    why: 'A record made of shards forms the bowl of the d, and the tonearm is its stem. Music lowers the arm and closes the letter; silence lifts the arm away. In the lockup the mark simply finishes the word: music + d.' },
+  { n: 3, name: 'Flatline', build: flatline, from: 'E silence + today’s wave favicon',
+    line: 'The seam is the signal.',
+    why: 'Two halves: warm on top for bass, cool below for treble. In silence they come apart along a flat line and stop level. When sound arrives, the seam becomes a live waveform and the halves close up and spin. It grows straight out of the wave in the current favicon.' },
+  { n: 4, name: 'Light leak', build: lightLeak, from: 'A shards + Cosmos',
+    line: 'The music is the light inside the record.',
+    why: 'A dark record cracked into shards. Light pours through the cracks as loud as the music, and every kick sends rays past the rim. In silence the light goes out and the pieces ease apart. The closest of the five to what the app actually shows.' },
+  { n: 5, name: 'Misprint', build: misprint, from: 'E silence + print culture',
+    line: 'A risograph print, out of register until the beat drops.',
+    why: 'Two layers of ink, warm orange and teal. In silence the print slips out of register and every shard sits slightly off. Music pulls everything into exact alignment, where the two inks mix into one cream disc (on light backgrounds the orange layer simply sits on top). It also has the most potential for posters, stickers and merch.' },
+];
+
+/* ───────── boards ───────── */
+const updates = [];
+const mount = (host, size, build) => {
+  const svg = el('svg', { viewBox: '-120 -120 240 240', width: size, height: size, role: 'img' }, host);
+  updates.push(build(svg));
+};
+const boards = document.getElementById('boards');
+for (const idea of IDEAS) {
+  const b = document.createElement('section');
+  b.className = 'board';
+  const word = idea.d ? 'music' : 'musicd';
+  b.innerHTML = `
+    <div class="stage ink"></div>
+    <div class="info">
+      <div class="title"><span class="num">${idea.n}</span><h2>${idea.name}</h2><span class="from">from ${idea.from}</span></div>
+      <p class="line">${idea.line}</p>
+      <p class="why">${idea.why}</p>
+      <div class="kit">
+        <div class="tile ink appicons">
+          <div><div class="icon ink" style="background:#0c0c16"></div><small>app icon</small></div>
+          <div><div class="icon cream"></div><small>light</small></div>
+        </div>
+        <div class="tile ink tabs">
+          <div class="tab"><span class="fav32"></span>musicd</div>
+          <div class="tab b"><span class="fav16"></span>musicd</div>
+        </div>
+        <div class="lockups">
+          <div class="lockup ink ${idea.d ? 'd' : ''}">${idea.d ? `<b>${word}</b><span class="lk"></span>` : `<span class="lk"></span><b>${word}</b>`}</div>
+          <div class="lockup cream ${idea.d ? 'd' : ''}">${idea.d ? `<b>${word}</b><span class="lk"></span>` : `<span class="lk"></span><b>${word}</b>`}</div>
+        </div>
+      </div>
+    </div>`;
+  boards.appendChild(b);
+  mount(b.querySelector('.stage'), 290, idea.build);
+  b.querySelectorAll('.icon').forEach(e => mount(e, 76, idea.build));
+  mount(b.querySelector('.fav32'), 18, idea.build);
+  mount(b.querySelector('.fav16'), 16, idea.build);
+  b.querySelectorAll('.lk').forEach(e => mount(e, idea.d ? 50 : 40, idea.build));
+}
+// The d mark sits on the text baseline so it reads as the last letter.
+document.querySelectorAll('.lockup.d .lk svg').forEach(s => { s.style.marginBottom = '9px'; s.style.marginLeft = '-3px'; });
+
+/* ───────── playback ───────── */
+const G = { t: 0, dt: 0, asm: +(new URLSearchParams(location.search).get('asm') || 0),
+  angle: 0, speed: 0, play: 1, apart: 0, level: 0, beat: 0, braking: false, remain: 0, brakeA: 0 };
+let manualPlaying = true, mic = null;
+const $ = id => document.getElementById(id);
+const autoBox = $('auto'), status = $('status');
+if (new URLSearchParams(location.search).has('silent')) { autoBox.checked = false; manualPlaying = false; G.play = 0; G.apart = 1; }
+
+function isPlaying() {
+  if (mic) return G.t - mic.lastSound < 1.2;
+  if (autoBox.checked) return (G.t % 10) < 6;
+  return manualPlaying;
+}
+function togglePlay() { manualPlaying = !isPlaying(); autoBox.checked = false; }
+$('play').onclick = togglePlay;
+$('again').onclick = () => { G.asm = 0; G.speed = 0; G.angle = 0; };
+autoBox.onchange = () => { manualPlaying = true; };
+$('mic').onclick = async () => {
+  if (mic) { mic.stream.getTracks().forEach(t => t.stop()); mic.ctx.close(); mic = null;
+    $('mic').classList.remove('on'); $('mic').textContent = 'Listen to mic'; return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const ctx = new AudioContext(), an = ctx.createAnalyser();
+    an.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(an);
+    mic = { stream, ctx, an, buf: new Float32Array(an.fftSize), fast: 0, slow: 0, lastSound: -99 };
+    $('mic').classList.add('on'); $('mic').textContent = 'Stop mic';
+  } catch (e) { alert('Could not open the microphone: ' + e.message); }
+};
+addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  else if (e.key === 'r' || e.key === 'R') $('again').click();
+});
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  G.dt = dt; G.t += dt; G.asm += dt;
+  if (mic) {
+    mic.an.getFloatTimeDomainData(mic.buf);
+    let s = 0; for (const v of mic.buf) s += v * v;
+    const rms = Math.sqrt(s / mic.buf.length);
+    mic.fast += (rms - mic.fast) * .5; mic.slow += (rms - mic.slow) * .04;
+    if (rms > .008) mic.lastSound = G.t;
+    G.level = clamp01(rms * 10);
+    G.beat = mic.fast > mic.slow * 1.45 && mic.fast > .02 ? 1 : G.beat * Math.exp(-dt / .12);
+  }
+  const playing = isPlaying();
+
+  // Motor: spins up once the record is assembled; on silence it brakes so it comes to rest upright.
+  if (playing) {
+    G.braking = false;
+    if (G.asm > 1.2) G.speed = Math.min(MAX_SPEED, G.speed + MAX_SPEED / SPIN_UP * dt);
+    G.angle = (G.angle + G.speed * dt) % 360;
+  } else if (G.speed > 0) {
+    if (!G.braking) {
+      const v = G.speed, minD = v * v / (2 * (MAX_SPEED / COAST));
+      let d = (360 - G.angle % 360) % 360; while (d < minD) d += 360;
+      G.remain = d; G.brakeA = v * v / (2 * d); G.braking = true;
+    }
+    const step = Math.min(G.remain, G.speed * dt);
+    G.angle += step; G.remain -= step; G.speed = Math.max(0, G.speed - G.brakeA * dt);
+    if (G.remain <= .05 || G.speed === 0) { G.speed = 0; G.angle = 0; }
+  }
+  G.play += ((playing ? 1 : 0) - G.play) * (1 - Math.exp(-4 * dt));
+  G.apart += ((playing ? 0 : 1) - G.apart) * (1 - Math.exp(-(playing ? 9 : 1.4) * dt));
+  if (!mic) { // a simulated 120 bpm song
+    const b = Math.exp(-(G.t % .5) / .09);
+    G.beat = b * G.play;
+    G.level = G.play * (.55 + .2 * Math.sin(G.t * 1.7) + .25 * b);
+  }
+  status.textContent = (playing ? '♪ playing' : 'silence') + (mic ? ' · mic' : autoBox.checked ? ' · demo' : '');
+  status.classList.toggle('silent', !playing);
+  $('play').textContent = playing ? 'Silence' : 'Play';
+  for (const u of updates) u(G);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

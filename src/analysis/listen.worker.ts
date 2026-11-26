@@ -17,8 +17,10 @@ const GROUPS: Record<Instrument, number[]> = {
   // Singing in a dense mix is often heard as "Speech", so speech counts too.
   voice: [0, 24, 25, 29, 30, 31, 32, 249],
   keys: [147, 148, 149, 150, 151, 152, 155],
-  strings: [179, 184, 185, 186, 187, 188, 189],
-  guitar: [134, 135, 136, 138, 139, 141, 142, 144, 146],
+  // Sustained melodic instruments: bowed strings, and flutes (191).
+  strings: [179, 184, 185, 186, 187, 188, 189, 191],
+  // Plucked strings, including sitar (143), zither such as the đàn tranh (145) and harp (194).
+  guitar: [134, 135, 136, 138, 139, 141, 142, 143, 144, 145, 146, 194],
   bass: [137, 189],
   synth: [153, 234, 241],
 };

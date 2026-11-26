@@ -26,6 +26,9 @@ export function applyPresence(f: Frame, ears: Ears, stemsChecked = false): Frame
   const sure = clamp(drums / DRUMS_ON);
   if (sure < 1) for (const h of f.hits) h.v *= 0.2 + 0.8 * sure;
   if (voice < VOICE_ON) {
+    // Not recognised as a voice: still the melody, drawn as an instrument's.
+    // (The recogniser often misses a male voice under loud guitars.)
+    if (f.voice) f.melody = f.voice;
     f.voice = null;
     for (const n of f.notes) if (n.voice === 'vocals') n.voice = 'lead';
   }
